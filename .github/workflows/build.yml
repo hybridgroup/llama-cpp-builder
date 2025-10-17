@@ -25,6 +25,7 @@ jobs:
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
+          fetch-tags: 'true'
       - name: Determine tag name
         id: tag
         uses: ./.github/actions/get-tag-name
