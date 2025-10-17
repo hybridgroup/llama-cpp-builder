@@ -40,3 +40,8 @@ jobs:
         with:
             name: llama-${{ steps.tag.outputs.name }}-bin-ubuntu-cuda-x64
             path: llama.cpp/build/bin
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: llama-${{ steps.tag.outputs.name }}-bin-ubuntu-cuda-x64
+          tag: ${{ steps.tag.outputs.name }}
+          commit: main
