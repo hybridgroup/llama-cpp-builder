@@ -25,12 +25,17 @@ jobs:
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
+      - name: Determine tag name
+        id: tag
+        uses: ./.github/actions/get-tag-name
+        with:
+          repo-path: ./llama.cpp
       - name: Build amd64
         run: |
-          docker pull --platform linux/amd64 ghcr.io/hybridgroup/llama-cpp-builder-cuda-12.9
-          docker run --rm -e -v $(pwd):/src -a stdout -a stderr ghcr.io/hybridgroup/llama-cpp-builder-cuda-12.9
+          docker pull --platform linux/amd64 ghcr.io/hybridgroup/llama-cpp-builder-cuda-12.9:latest
+          docker run --rm -v $(pwd):/src -a stdout -a stderr --platform linux/amd64 ghcr.io/hybridgroup/llama-cpp-builder-cuda-12.9:latest
       - name: Archive llama.cpp libraries
         uses: actions/upload-artifact@v4
         with:
-            name: llama-bin-ubuntu-cuda-x64
+            name: llama-${{ steps.tag.outputs.name }}-bin-ubuntu-cuda-x64
             path: llama.cpp/build/bin
