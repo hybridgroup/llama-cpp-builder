@@ -8,4 +8,4 @@ cmake -B build \
     -DCMAKE_CUDA_ARCHITECTURES="86;89" \
     -DLLAMA_CURL=OFF
 
-cmake --build build --config Release
+cmake --build build --config Release -j $(nproc)
