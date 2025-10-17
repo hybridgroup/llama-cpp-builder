@@ -4,14 +4,17 @@
 
 
 
-### docker
+### building docker
 
 ```
 docker build -t llama-cuda-builder .
 ```
 
-### building
+### running
 
 ```
 docker run --rm -v $(pwd):/src -a stdout -a stderr llama-cuda-builder
 ```
+
+
+The build artifacts are in `llama.cpp/build/bin`
