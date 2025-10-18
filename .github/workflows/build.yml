@@ -37,7 +37,7 @@ jobs:
           docker run --rm -v $(pwd):/src -a stdout -a stderr --platform linux/amd64 ghcr.io/hybridgroup/llama-cpp-builder-cuda-12.9:latest
       - name: Compress release binaries
         run: |
-          zip llama-${{ steps.tag.outputs.name }}-bin-ubuntu-cuda-x64.zip llama.cpp/build/bin/*
+          zip -j llama-${{ steps.tag.outputs.name }}-bin-ubuntu-cuda-x64.zip llama.cpp/build/bin/*
       - name: Create release
         uses: ncipollo/release-action@v1
         with:
