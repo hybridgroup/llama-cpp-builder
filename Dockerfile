@@ -11,6 +11,6 @@ RUN apt-get update && \
 
 WORKDIR /src
 
-COPY ./builder.sh /src/
+COPY ./builder.sh /src/builder.sh
 
 CMD ["/src/builder.sh"]
