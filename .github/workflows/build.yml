@@ -53,6 +53,12 @@ jobs:
     if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout llama.cpp repo
+        uses: actions/checkout@v5
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
+          fetch-tags: 'true'
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
