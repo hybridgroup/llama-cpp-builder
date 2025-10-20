@@ -41,9 +41,9 @@ jobs:
           git fetch --prune --prune-tags --depth=1 --no-recurse-submodules
       - name: Determine own tag name
         id: currenttag
-        uses: ./.github/actions/get-tag-name
-        with:
-          repo-path: .
+        run: |
+          BUILD_NUMBER="$(git describe --tags --abbrev=0)"
+          echo "name=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
       - name: Save tags
         id: tags
         run: |
