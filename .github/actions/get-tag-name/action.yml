@@ -18,6 +18,5 @@ runs:
       shell: bash
       run: |
         cd ${{ inputs.repo-path }}
-        BUILD_TAGS="$(git rev-list --tags --max-count=1)"
-        BUILD_NUMBER="$(git describe --tags $BUILD_TAGS)"
+        BUILD_NUMBER="$(git describe --abbrev=0 --tags)"
         echo "name=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
