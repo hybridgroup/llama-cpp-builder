@@ -38,7 +38,7 @@ jobs:
           repo-path: ./llama.cpp
       - name: Fetch tags
         run: |
-          git fetch --prune --prune-tags --depth=1 --no-recurse-submodules
+          git fetch --depth=10 --no-recurse-submodules
       - name: Determine own tag name
         id: currenttag
         run: |
