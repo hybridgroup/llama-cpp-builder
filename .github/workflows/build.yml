@@ -40,12 +40,12 @@ jobs:
           repo-path: ./llama.cpp
       - name: Fetch tags
         run: |
-          git fetch --tags
+          git fetch --prune --prune-tags --depth=5 --no-recurse-submodules
       - name: Determine own tag name
         id: currenttag
-        run: |
-          BUILD_NUMBER="$(git describe --tags --abbrev=0)"
-          echo "name=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
+        uses: ./.github/actions/get-tag-name
+        with:
+          repo-path: .
       - name: Save tags
         id: tags
         run: |
