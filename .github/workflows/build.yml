@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v5
+        with:
+          fetch-tags: 'true'
       - name: Checkout llama.cpp repo
         uses: actions/checkout@v5
         with:
