@@ -76,3 +76,24 @@ jobs:
           artifacts: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip
           tag: ${{ needs.check-version.outputs.llama-tag }}
           commit: main
+      - name: Trigger yzma repo Linux build
+        run: |
+          curl -X POST \
+          -H "Authorization: Bearer ${{secrets.YZMA_BUILD_ACCESS}}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/hybridgroup/yzma/actions/workflows/linux.yml/dispatches \
+          -d '{"ref": "main"}'
+      - name: Trigger yzma repo macOS build
+        run: |
+          curl -X POST \
+          -H "Authorization: Bearer ${{secrets.YZMA_BUILD_ACCESS}}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/hybridgroup/yzma/actions/workflows/macos.yml/dispatches \
+          -d '{"ref": "main"}'
+      - name: Trigger yzma repo Windows build
+        run: |
+          curl -X POST \
+          -H "Authorization: Bearer ${{secrets.YZMA_BUILD_ACCESS}}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/hybridgroup/yzma/actions/workflows/windows.yml/dispatches \
+          -d '{"ref": "main"}'
