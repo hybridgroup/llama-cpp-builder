@@ -30,7 +30,7 @@ jobs:
       - name: Fetch llama tags
         run: |
           cd llama.cpp
-          git fetch --prune --prune-tags --depth=1 --no-recurse-submodules
+          git fetch --prune --prune-tags --unshallow --no-recurse-submodules
       - name: Determine llama.cpp tag name
         id: llamatag
         uses: ./.github/actions/get-tag-name
@@ -38,7 +38,7 @@ jobs:
           repo-path: ./llama.cpp
       - name: Fetch tags
         run: |
-          git fetch --prune --prune-tags --depth=1 --no-recurse-submodules
+          git fetch --prune --prune-tags --unshallow --no-recurse-submodules
       - name: Determine own tag name
         id: currenttag
         uses: ./.github/actions/get-tag-name
@@ -50,10 +50,13 @@ jobs:
           echo "llama-tag=${{ steps.llamatag.outputs.name }}" >> "$GITHUB_OUTPUT"
           echo "current-tag=${{ steps.currenttag.outputs.name }}" >> "$GITHUB_OUTPUT"
 
-  build-cuda:
+  build-cuda-amd64:
     needs: check-version
     if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
     runs-on: ubuntu-latest
+    container:
+      image: nvidia/cuda:12.9.1-devel-ubuntu24.04
+      options: --platform linux/amd64
     steps:
       - name: Check out the repo
         uses: actions/checkout@v5
@@ -62,20 +65,100 @@ jobs:
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
+          ref: ${{ needs.check-version.outputs.llama-tag }}
           fetch-tags: 'true'
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+            apt update
+            apt install -y cmake build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip
       - name: Build amd64
+        working-directory: llama.cpp
         run: |
-          docker pull --platform linux/amd64 ghcr.io/hybridgroup/llama-cpp-builder-cuda-12.9:latest
-          docker run --rm -v $(pwd):/src -a stdout -a stderr --platform linux/amd64 --entrypoint="/src/builder.sh" ghcr.io/hybridgroup/llama-cpp-builder-cuda-12.9:latest
-      - name: Compress release binaries
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
+            -DCMAKE_CUDA_ARCHITECTURES="86;89" \
+            -DGGML_CPU_ALL_VARIANTS=ON \
+            -DGGML_CUDA=ON \
+            -DGGML_BACKEND_DL=ON
+          cmake --build build --config Release -j $(nproc)
+      - name: Upload release binaries
+        uses: actions/upload-artifact@v5
+        with:
+          path: llama.cpp/build/bin/*
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip
+
+  build-cuda-arm64:
+    needs: check-version
+    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    runs-on: ubuntu-22.04-arm
+    container: 
+      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      options: --platform linux/arm64
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+      - name: Checkout llama.cpp repo
+        uses: actions/checkout@v5
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
+          ref: ${{ needs.check-version.outputs.llama-tag }}
+          fetch-tags: 'true'
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          zip -j llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip llama.cpp/build/bin/*
-      - name: Create release
+            apt update
+            apt install -y cmake build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip
+      - name: Build arm64
+        working-directory: llama.cpp
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
+            -DCMAKE_CUDA_ARCHITECTURES="87" \
+            -DGGML_CPU_ALL_VARIANTS=ON \
+            -DGGML_CUDA=ON \
+            -DGGML_BACKEND_DL=ON
+          cmake --build build --config Release -j $(nproc)
+      - name: Upload release binaries
+        uses: actions/upload-artifact@v5
+        with:
+          path: llama.cpp/build/bin/*
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.zip
+
+  release:
+    needs: 
+      - check-version
+      - build-cuda-amd64
+      - build-cuda-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+      - name: Download amd64 artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.zip
+      - name: Create final release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip
           tag: ${{ needs.check-version.outputs.llama-tag }}
           commit: main
+          body: |
+            ## Changes in llama.cpp ${{ needs.check-version.outputs.llama-tag }}
+            See the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/${{ needs.check-version.outputs.llama-tag }}) for details.
+          artifacts: "llama-*.zip"
+
+  trigger-yzma-tests:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
       - name: Trigger yzma repo Linux build
         run: |
           curl -X POST \

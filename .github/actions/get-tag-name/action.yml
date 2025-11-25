@@ -18,6 +18,11 @@ runs:
       shell: bash
       run: |
         cd ${{ inputs.repo-path }}
-        BUILD_TAGS="$(git rev-list --tags --max-count=1)"
-        BUILD_NUMBER="$(git describe --tags $BUILD_TAGS)"
+        # Get the most recent release tag (format: b followed by numbers)
+        BUILD_NUMBER="$(git tag --sort=-version:refname | grep -E '^b[0-9]+$' | head -n 1 || true)"
+        if [ -z "$BUILD_NUMBER" ]; then
+          echo "No release tags found, using b0"
+          BUILD_NUMBER="b0"
+        fi
+        echo "Found tag: $BUILD_NUMBER"
         echo "name=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
