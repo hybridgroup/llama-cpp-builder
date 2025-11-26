@@ -140,14 +140,14 @@ jobs:
       - name: Download amd64 artifact
         uses: ./.github/actions/download-artifact
         with:
-          workflow: build.yml
+          run-id: ${{ github.run_id }}
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Download arm64 artifact
         uses: ./.github/actions/download-artifact
         with:
-          workflow: build.yml
+          run-id: ${{ github.run_id }}
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
           token: ${{ secrets.GITHUB_TOKEN }}
