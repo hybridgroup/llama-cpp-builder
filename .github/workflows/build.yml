@@ -87,7 +87,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           path: llama.cpp/build/bin/*
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
 
   build-cuda-arm64:
     needs: check-version
@@ -126,7 +126,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           path: llama.cpp/build/bin/*
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.zip
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
 
   release:
     needs: 
@@ -138,13 +138,15 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v5
       - name: Download amd64 artifact
-        uses: actions/download-artifact@v6
+        uses: dawidd6/action-download-artifact@v11
         with:
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
+          skip_unpack: true
       - name: Download arm64 artifact
-        uses: actions/download-artifact@v6
+        uses: dawidd6/action-download-artifact@v11
         with:
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.zip
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
+          skip_unpack: true
       - name: Create final release
         uses: ncipollo/release-action@v1
         with:
@@ -153,7 +155,7 @@ jobs:
           body: |
             ## Changes in llama.cpp ${{ needs.check-version.outputs.llama-tag }}
             See the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/${{ needs.check-version.outputs.llama-tag }}) for details.
-          artifacts: "llama-*.zip"
+          artifacts: "*.zip"
 
   trigger-yzma-tests:
     needs: release
