@@ -1,0 +1,30 @@
+name: "Linux - Setup Vulkan SDK for ubuntu-22.04-arm"
+description: "Setup Vulkan SDK for Linux ubuntu-22.04-arm"
+inputs:
+  path:
+    description: "Installation path"
+    required: true
+  version:
+    description: "Vulkan SDK version"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Vulkan SDK
+      id: setup
+      uses: ./.github/actions/unarchive-tar
+      with:
+        url: https://github.com/jakoch/vulkan-sdk-arm/releases/download/${{ inputs.version }}/vulkansdk-ubuntu-22.04-arm-${{ inputs.version }}.tar.xz
+        path: ${{ inputs.path }}
+        strip: 1
+        filter: "${{ inputs.version }}/"
+    - name: Verify extraction
+      shell: bash
+      run: |
+        echo "Contents of ${{ inputs.path }}:"
+        ls -la ${{ inputs.path }}
+        if [ ! -f "${{ inputs.path }}/setup-env.sh" ]; then
+          echo "ERROR: setup-env.sh not found!"
+          exit 1
+        fi
