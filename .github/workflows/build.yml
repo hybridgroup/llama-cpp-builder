@@ -138,15 +138,19 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v5
       - name: Download amd64 artifact
-        uses: dawidd6/action-download-artifact@v11
+        uses: ./.github/actions/download-artifact
         with:
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
-          skip_unpack: true
+          workflow: build.yml
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Download arm64 artifact
-        uses: dawidd6/action-download-artifact@v11
+        uses: ./.github/actions/download-artifact
         with:
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
-          skip_unpack: true
+          workflow: build.yml
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Create final release
         uses: ncipollo/release-action@v1
         with:
