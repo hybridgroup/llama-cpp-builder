@@ -128,28 +128,89 @@ jobs:
           path: llama.cpp/build/bin/*
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
 
+  build-vulkan-arm64:
+    needs: check-version
+    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+      - name: Checkout llama.cpp repo
+        uses: actions/checkout@v5
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
+          ref: ${{ needs.check-version.outputs.llama-tag }}
+          fetch-tags: 'true'
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo add-apt-repository -y ppa:kisak/kisak-mesa
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip mesa-vulkan-drivers libxcb-xinput0 libxcb-xinerama0 libxcb-cursor-dev
+      - name: Set latest Vulkan SDK version
+        id: vulkan_sdk_version
+        run: |
+          echo "VULKAN_SDK_VERSION=1.4.328.1" >> "$GITHUB_ENV"
+      - name: Use Vulkan SDK Cache
+        uses: actions/cache@v4
+        id: cache-sdk
+        with:
+          path: ./vulkan_sdk
+          key: vulkan-sdk-${{ env.VULKAN_SDK_VERSION }}-${{ runner.os }}
+      - name: Setup Vulkan SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        uses: ./.github/actions/linux-setup-vulkan
+        with:
+          path: ./vulkan_sdk
+          version: ${{ env.VULKAN_SDK_VERSION }}
+      - name: Build arm64
+        working-directory: llama.cpp
+        run: |
+          source $GITHUB_WORKSPACE/vulkan_sdk/setup-env.sh
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
+            -DGGML_CPU_ALL_VARIANTS=ON \
+            -DGGML_VULKAN=ON \
+            -DGGML_BACKEND_DL=ON
+          cmake --build build --config Release -j $(nproc)
+      - name: Upload release binaries
+        uses: actions/upload-artifact@v5
+        with:
+          path: llama.cpp/build/bin/*
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
+
   release:
     needs: 
       - check-version
       - build-cuda-amd64
       - build-cuda-arm64
+      - build-vulkan-arm64
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
         uses: actions/checkout@v5
-      - name: Download amd64 artifact
+      - name: Download amd64 CUDA artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Download arm64 artifact
+      - name: Download arm64 CUDA artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download arm64 Vulkan artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Create final release
         uses: ncipollo/release-action@v1
