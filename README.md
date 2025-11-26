@@ -1,8 +1,12 @@
-# llama.cpp Ubuntu CUDA builds
+# llama.cpp - Ubuntu CUDA and Vulkan binaries
 
-This repo builds binary versions of `llama.cpp` for Ubuntu with CUDA support.
+This repo builds binary versions of `llama.cpp` for Ubuntu with CUDA and Vulkan support.
 
-Currently supported build configurations:
+New releases are automatically built for the latest release version of `llama.cpp`.
+
+## CUDA
+
+Currently supported CUDA build configurations:
 
 | CPU arch   | OS           | CUDA  | Nvidia Compute arch |
 |--------|--------------|-------|---------|
@@ -13,4 +17,12 @@ Compute architectures `86` and `89` are those used by consumer video cards.
 
 Compute architecture `87` is used by Jetson Orin and Jetson AGX.
 
-Check releases for the latest version.
+## Vulkan
+
+Currently supported Vulkan build configurations:
+
+| CPU arch   | OS           | Vulkan  |
+|--------|--------------|-------|
+| amd64  | Ubuntu 22.04 | 1.4.328.1  |
+
+Prebuilt Vulkan SDK for ARM64 comes from https://github.com/jakoch/vulkan-sdk-arm
