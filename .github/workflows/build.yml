@@ -92,10 +92,10 @@ jobs:
 
   build-cuda-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
-    runs-on: ubuntu-24.04-arm
+#    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    runs-on: ubuntu-22.04-arm
     container: 
-      image: nvidia/cuda:12.9.1-devel-ubuntu24.04
+      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
       options: --platform linux/arm64
     steps:
       - name: Check out the repo
@@ -111,8 +111,28 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-            apt update
-            apt install -y g++-14 gcc-14 build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
+          apt update
+          apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
+      - name: Cache GCC 14.3.0
+        uses: actions/cache@v4
+        id: cache-gcc
+        with:
+          path: /usr/local/gcc-14.3.0
+          key: gcc-14.3.0-arm64-cuda-ubuntu22.04-v2
+      - name: Build GCC 14.3.0
+        if: steps.cache-gcc.outputs.cache-hit != 'true'
+        run: |
+          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          tar -xf gcc-14.3.0.tar.gz
+          cd gcc-14.3.0
+          ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
+          make -j $(nproc)
+          make install
+          cd ..
+          rm -rf gcc-14.3.0 gcc-14.3.0.tar.gz
+      - name: Add GCC to PATH
+        run: |
+          echo "/usr/local/gcc-14.3.0/bin" >> $GITHUB_PATH
       - name: Setup cmake 4.2.0
         run: |
           mkdir -p ./cmake-4.2.0
@@ -124,8 +144,8 @@ jobs:
       - name: Build arm64
         working-directory: llama.cpp
         run: |
-          export CC=/usr/bin/gcc-14
-          export CXX=/usr/bin/g++-14
+          export CC=/usr/local/gcc-14.3.0/bin/gcc-14
+          export CXX=/usr/local/gcc-14.3.0/bin/g++-14
           cmake -S . -B build -G Ninja \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DCMAKE_CUDA_ARCHITECTURES="87" \
@@ -142,8 +162,8 @@ jobs:
 
   build-vulkan-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
-    runs-on: ubuntu-24.04-arm
+#    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    runs-on: ubuntu-22.04-arm
     steps:
       - name: Check out the repo
         uses: actions/checkout@v5
@@ -160,7 +180,27 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:kisak/kisak-mesa
           sudo apt-get update
-          sudo apt-get install -y g++-14 gcc-14 build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip mesa-vulkan-drivers libxcb-xinput0 libxcb-xinerama0 libxcb-cursor-dev wget libgmp-dev libmpfr-dev libmpc-dev
+          sudo apt-get install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip mesa-vulkan-drivers libxcb-xinput0 libxcb-xinerama0 libxcb-cursor-dev wget libgmp-dev libmpfr-dev libmpc-dev
+      - name: Cache GCC 14.3.0
+        uses: actions/cache@v4
+        id: cache-gcc
+        with:
+          path: /usr/local/gcc-14.3.0
+          key: gcc-14.3.0-arm64-vulkan-ubuntu22.04-v2
+      - name: Build GCC 14.3.0
+        if: steps.cache-gcc.outputs.cache-hit != 'true'
+        run: |
+          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          tar -xf gcc-14.3.0.tar.gz
+          cd gcc-14.3.0
+          ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
+          make -j $(nproc)
+          sudo make install
+          cd ..
+          rm -rf gcc-14.3.0 gcc-14.3.0.tar.gz
+      - name: Add GCC to PATH
+        run: |
+          echo "/usr/local/gcc-14.3.0/bin" >> $GITHUB_PATH
       - name: Setup cmake 4.2.0
         run: |
           mkdir -p ./cmake-4.2.0
@@ -188,8 +228,8 @@ jobs:
       - name: Build arm64
         working-directory: llama.cpp
         run: |
-          export CC=/usr/bin/gcc-14
-          export CXX=/usr/bin/g++-14
+          export CC=/usr/local/gcc-14.3.0/bin/gcc-14
+          export CXX=/usr/local/gcc-14.3.0/bin/g++-14
           source $GITHUB_WORKSPACE/vulkan_sdk/setup-env.sh
           cmake -S . -B build -G Ninja \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
