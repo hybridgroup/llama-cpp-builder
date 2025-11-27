@@ -79,6 +79,7 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DCMAKE_CUDA_ARCHITECTURES="86;89" \
+            -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
             -DGGML_BACKEND_DL=ON
@@ -118,6 +119,7 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DCMAKE_CUDA_ARCHITECTURES="87" \
+            -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
             -DGGML_BACKEND_DL=ON
@@ -171,6 +173,7 @@ jobs:
           source $GITHUB_WORKSPACE/vulkan_sdk/setup-env.sh
           cmake -S . -B build -G Ninja \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
+            -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_VULKAN=ON \
             -DGGML_BACKEND_DL=ON
