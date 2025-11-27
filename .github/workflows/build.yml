@@ -92,7 +92,7 @@ jobs:
 
   build-cuda-arm64:
     needs: check-version
-#    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
     runs-on: ubuntu-22.04-arm
     container: 
       image: nvidia/cuda:12.9.1-devel-ubuntu22.04
@@ -162,7 +162,7 @@ jobs:
 
   build-vulkan-arm64:
     needs: check-version
-#    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Check out the repo
