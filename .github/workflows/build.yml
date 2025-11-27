@@ -111,27 +111,9 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+            add-apt-repository -y ppa:ubuntu-toolchain-r/ppa
             apt update
-            apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
-      - name: Use gcc cache
-        uses: actions/cache@v4
-        id: cache-cuda-gcc-14-3-0
-        with:
-          path: /usr/local/gcc-14.3.0
-          key: gcc-14.3.0-${{ runner.os }}
-      - name: Setup gcc 14.3.0
-        if: steps.cache-cuda-gcc-14-3-0.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ./gcc-14.3.0
-          cd ./gcc-14.3.0
-          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
-          tar -xf gcc-14.3.0.tar.gz
-          cd gcc-14.3.0
-          ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14.3.0
-          make -j $(nproc)
-          make install
-          cd ..
-          rm -rf gcc-14.3.0 gcc-14.3.0.tar.gz
+            apt install -y gcc-16 build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
       - name: Use cmake cache
         uses: actions/cache@v4
         id: cache-cuda-cmake-4-2-0
@@ -186,28 +168,10 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/ppa
           sudo add-apt-repository -y ppa:kisak/kisak-mesa
           sudo apt-get update
-          sudo apt-get install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip mesa-vulkan-drivers libxcb-xinput0 libxcb-xinerama0 libxcb-cursor-dev wget libgmp-dev libmpfr-dev libmpc-dev
-      - name: Use gcc cache
-        uses: actions/cache@v4
-        id: cache-vulkan-gcc-14-3-0
-        with:
-          path: /usr/local/gcc-14.3.0
-          key: gcc-14.3.0-${{ runner.os }}
-      - name: Setup gcc 14.3.0
-        if: steps.cache-vulkan-gcc-14-3-0.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ./gcc-14.3.0
-          cd ./gcc-14.3.0
-          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
-          tar -xf gcc-14.3.0.tar.gz
-          cd gcc-14.3.0
-          ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14.3.0
-          make -j $(nproc)
-          sudo make install
-          cd ..
-          rm -rf gcc-14.3.0 gcc-14.3.0.tar.gz
+          sudo apt-get install -y gcc-16 build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip mesa-vulkan-drivers libxcb-xinput0 libxcb-xinerama0 libxcb-cursor-dev wget libgmp-dev libmpfr-dev libmpc-dev
       - name: Use cmake cache
         uses: actions/cache@v4
         id: cache-vulkan-cmake-4-2-0
