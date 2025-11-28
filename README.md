@@ -10,8 +10,8 @@ Currently supported CUDA build configurations:
 
 | CPU arch   | OS           | CUDA  | Nvidia Compute arch |
 |--------|--------------|-------|---------|
-| amd64  | Ubuntu       | 12.9  | 86, 89  |
-| arm64  | Ubuntu       | 12.9  | 87  |
+| amd64  | Ubuntu 24.04      | 12.9  | 86, 89  |
+| arm64  | Ubuntu 22.04      | 12.9  | 87  |
 
 Compute architectures `86` and `89` are those used by consumer video cards.
 
@@ -23,7 +23,7 @@ Currently supported Vulkan build configurations:
 
 | CPU arch   | OS           | Vulkan  |
 |--------|--------------|-------|
-| arm64  | Ubuntu | 1.4.328.1  |
+| arm64  | Ubuntu 22.04 | 1.4.328.1  |
 
 The prebuilt Vulkan SDK for ARM64 used for our builds comes from https://github.com/jakoch/vulkan-sdk-arm
 
