@@ -84,10 +84,13 @@ jobs:
             -DGGML_CUDA=ON \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
+      - name: Pack artifacts
+        run: |
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz -C llama.cpp/build/bin .
       - name: Upload release binaries
         uses: actions/upload-artifact@v5
         with:
-          path: llama.cpp/build/bin/*
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
 
   build-cuda-arm64:
@@ -154,10 +157,13 @@ jobs:
             -DGGML_CUDA=ON \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
+      - name: Pack artifacts
+        run: |
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz -C llama.cpp/build/bin .
       - name: Upload release binaries
         uses: actions/upload-artifact@v5
         with:
-          path: llama.cpp/build/bin/*
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
 
   build-vulkan-arm64:
@@ -240,10 +246,13 @@ jobs:
             -DGGML_VULKAN=ON \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
+      - name: Pack artifacts
+        run: |
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz -C llama.cpp/build/bin .
       - name: Upload release binaries
         uses: actions/upload-artifact@v5
         with:
-          path: llama.cpp/build/bin/*
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
 
   release:
@@ -263,6 +272,10 @@ jobs:
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract amd64 CUDA artifact
+        run: |
+          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
+          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64/*.tar.gz .
       - name: Download arm64 CUDA artifact
         uses: ./.github/actions/download-artifact
         with:
@@ -270,6 +283,10 @@ jobs:
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract arm64 CUDA artifact
+        run: |
+          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
+          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64/*.tar.gz .
       - name: Download arm64 Vulkan artifact
         uses: ./.github/actions/download-artifact
         with:
@@ -277,6 +294,10 @@ jobs:
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract arm64 Vulkan artifact
+        run: |
+          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
+          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64/*.tar.gz .
       - name: Create final release
         uses: ncipollo/release-action@v1
         with:
@@ -285,7 +306,7 @@ jobs:
           body: |
             ## Changes in llama.cpp ${{ needs.check-version.outputs.llama-tag }}
             See the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/${{ needs.check-version.outputs.llama-tag }}) for details.
-          artifacts: "*.zip"
+          artifacts: "*.tar.gz"
 
   trigger-yzma-tests:
     needs: release
