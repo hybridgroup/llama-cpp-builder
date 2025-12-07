@@ -93,6 +93,49 @@ jobs:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
 
+  build-cuda-13-amd64:
+    needs: check-version
+    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    runs-on: ubuntu-latest
+    container:
+      image: nvidia/cuda:13.0.2-devel-ubuntu24.04
+      options: --platform linux/amd64
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+      - name: Checkout llama.cpp repo
+        uses: actions/checkout@v5
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
+          ref: ${{ needs.check-version.outputs.llama-tag }}
+          fetch-tags: 'true'
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+            apt update
+            apt install -y cmake build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip
+      - name: Build amd64
+        working-directory: llama.cpp
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
+            -DCMAKE_CUDA_ARCHITECTURES="86;89" \
+            -DGGML_NATIVE=OFF \
+            -DGGML_CPU_ALL_VARIANTS=ON \
+            -DGGML_CUDA=ON \
+            -DGGML_BACKEND_DL=ON
+          cmake --build build --config Release -j $(nproc)
+      - name: Pack artifacts
+        run: |
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Upload release binaries
+        uses: actions/upload-artifact@v5
+        with:
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64
+
   build-cuda-arm64:
     needs: check-version
     if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
@@ -165,6 +208,79 @@ jobs:
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
+
+  build-cuda-13-arm64:
+    needs: check-version
+    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    runs-on: ubuntu-22.04-arm
+    container:
+      image: nvidia/cuda:13.0.2-devel-ubuntu22.04
+      options: --platform linux/arm64
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v5
+      - name: Checkout llama.cpp repo
+        uses: actions/checkout@v5
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
+          ref: ${{ needs.check-version.outputs.llama-tag }}
+          fetch-tags: 'true'
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt update
+          apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
+      - name: Cache GCC 14.3.0
+        uses: actions/cache@v4
+        id: cache-gcc
+        with:
+          path: /usr/local/gcc-14.3.0
+          key: gcc-14.3.0-arm64-cuda-13-ubuntu22.04-v2
+      - name: Build GCC 14.3.0
+        if: steps.cache-gcc.outputs.cache-hit != 'true'
+        run: |
+          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          tar -xf gcc-14.3.0.tar.gz
+          cd gcc-14.3.0
+          ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
+          make -j $(nproc)
+          make install
+          cd ..
+          rm -rf gcc-14.3.0 gcc-14.3.0.tar.gz
+      - name: Add GCC to PATH
+        run: |
+          echo "/usr/local/gcc-14.3.0/bin" >> $GITHUB_PATH
+      - name: Setup cmake 4.2.0
+        run: |
+          mkdir -p ./cmake-4.2.0
+          cd ./cmake-4.2.0
+          wget -O cmake.sh https://github.com/Kitware/CMake/releases/download/v4.2.0/cmake-4.2.0-linux-aarch64.sh
+          sh cmake.sh --prefix=/usr/local --skip-license
+          cd ..
+          rm -rf cmake-4.2.0
+      - name: Build arm64
+        working-directory: llama.cpp
+        run: |
+          export CC=/usr/local/gcc-14.3.0/bin/gcc-14
+          export CXX=/usr/local/gcc-14.3.0/bin/g++-14
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
+            -DCMAKE_CUDA_ARCHITECTURES="87" \
+            -DGGML_NATIVE=OFF \
+            -DGGML_CPU_ALL_VARIANTS=ON \
+            -DGGML_CUDA=ON \
+            -DGGML_BACKEND_DL=ON
+          cmake --build build --config Release -j $(nproc)
+      - name: Pack artifacts
+        run: |
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Upload release binaries
+        uses: actions/upload-artifact@v5
+        with:
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64
 
   build-vulkan-arm64:
     needs: check-version
@@ -259,7 +375,9 @@ jobs:
     needs: 
       - check-version
       - build-cuda-amd64
+      - build-cuda-13-amd64
       - build-cuda-arm64
+      - build-cuda-13-arm64
       - build-vulkan-arm64
     runs-on: ubuntu-latest
     steps:
@@ -276,6 +394,17 @@ jobs:
         run: |
           unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
           mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64/*.tar.gz .
+      - name: Download amd64 CUDA 13 artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract amd64 CUDA artifact
+        run: |
+          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64
+          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64/*.tar.gz .
       - name: Download arm64 CUDA artifact
         uses: ./.github/actions/download-artifact
         with:
@@ -287,6 +416,17 @@ jobs:
         run: |
           unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
           mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64/*.tar.gz .
+      - name: Download arm64 CUDA 13 artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract arm64 CUDA artifact
+        run: |
+          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64
+          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64/*.tar.gz .
       - name: Download arm64 Vulkan artifact
         uses: ./.github/actions/download-artifact
         with:
