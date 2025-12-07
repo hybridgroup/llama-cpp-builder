@@ -86,9 +86,7 @@ jobs:
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
         run: |
-          mkdir -p llama-${{ needs.check-version.outputs.llama-tag }}
-          cp -r llama.cpp/build/bin/* llama-${{ needs.check-version.outputs.llama-tag }}/
-          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz llama-${{ needs.check-version.outputs.llama-tag }}
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
         uses: actions/upload-artifact@v5
         with:
@@ -161,9 +159,7 @@ jobs:
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
         run: |
-          mkdir -p llama-${{ needs.check-version.outputs.llama-tag }}
-          cp -r llama.cpp/build/bin/* llama-${{ needs.check-version.outputs.llama-tag }}/
-          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz llama-${{ needs.check-version.outputs.llama-tag }}
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
         uses: actions/upload-artifact@v5
         with:
@@ -252,9 +248,7 @@ jobs:
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
         run: |
-          mkdir -p llama-${{ needs.check-version.outputs.llama-tag }}
-          cp -r llama.cpp/build/bin/* llama-${{ needs.check-version.outputs.llama-tag }}/
-          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz llama-${{ needs.check-version.outputs.llama-tag }}
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
         uses: actions/upload-artifact@v5
         with:
