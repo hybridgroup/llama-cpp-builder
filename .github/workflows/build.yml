@@ -8,9 +8,9 @@ on:
   schedule:
     - cron: '15 * * * *'
 
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.ref }}
-#   cancel-in-progress: true
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check-version:
@@ -77,6 +77,8 @@ jobs:
         working-directory: llama.cpp
         run: |
           cmake -S . -B build -G Ninja \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DCMAKE_CUDA_ARCHITECTURES="86;89" \
             -DGGML_NATIVE=OFF \
@@ -120,6 +122,8 @@ jobs:
         working-directory: llama.cpp
         run: |
           cmake -S . -B build -G Ninja \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DCMAKE_CUDA_ARCHITECTURES="86;89" \
             -DGGML_NATIVE=OFF \
@@ -193,6 +197,8 @@ jobs:
           export CC=/usr/local/gcc-14.3.0/bin/gcc-14
           export CXX=/usr/local/gcc-14.3.0/bin/g++-14
           cmake -S . -B build -G Ninja \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DCMAKE_CUDA_ARCHITECTURES="87" \
             -DGGML_NATIVE=OFF \
@@ -266,6 +272,8 @@ jobs:
           export CC=/usr/local/gcc-14.3.0/bin/gcc-14
           export CXX=/usr/local/gcc-14.3.0/bin/g++-14
           cmake -S . -B build -G Ninja \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DCMAKE_CUDA_ARCHITECTURES="87" \
             -DGGML_NATIVE=OFF \
@@ -356,6 +364,8 @@ jobs:
           export CXX=$GITHUB_WORKSPACE/gcc-14.3.0/bin/g++-14
           source $GITHUB_WORKSPACE/vulkan_sdk/setup-env.sh
           cmake -S . -B build -G Ninja \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
