@@ -11,7 +11,9 @@ Currently supported CUDA build configurations:
 | CPU arch   | OS           | CUDA  | Nvidia Compute arch |
 |--------|--------------|-------|---------|
 | amd64  | Ubuntu 24.04      | 12.9  | 86, 89  |
+| amd64  | Ubuntu 24.04      | 13.0.88  | 86, 89  |
 | arm64  | Ubuntu 22.04      | 12.9  | 87  |
+| arm64  | Ubuntu 22.04      | 13.0.88  | 87  |
 
 Compute architectures `86` and `89` are those used by consumer video cards.
 
