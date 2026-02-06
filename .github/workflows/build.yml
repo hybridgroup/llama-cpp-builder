@@ -348,7 +348,7 @@ jobs:
       - name: Set latest Vulkan SDK version
         id: vulkan_sdk_version
         run: |
-          echo "VULKAN_SDK_VERSION=1.4.328.1" >> "$GITHUB_ENV"
+          echo "VULKAN_SDK_VERSION=1.4.335.0" >> "$GITHUB_ENV"
       - name: Use Vulkan SDK Cache
         uses: actions/cache@v4
         id: cache-sdk
