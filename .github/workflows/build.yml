@@ -20,9 +20,9 @@ jobs:
       current-tag: ${{ steps.tags.outputs.current-tag }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout llama.cpp repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
@@ -59,9 +59,9 @@ jobs:
       options: --platform linux/amd64
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout llama.cpp repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
@@ -84,6 +84,7 @@ jobs:
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
+            -DGGML_CUDA_CUB_3DOT2=ON \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -104,9 +105,9 @@ jobs:
       options: --platform linux/amd64
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout llama.cpp repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
@@ -129,6 +130,7 @@ jobs:
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
+            -DGGML_CUDA_CUB_3DOT2=ON \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -149,9 +151,9 @@ jobs:
       options: --platform linux/arm64
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout llama.cpp repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
@@ -204,6 +206,7 @@ jobs:
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
+            -DGGML_CUDA_CUB_3DOT2=ON \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -224,9 +227,9 @@ jobs:
       options: --platform linux/arm64
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout llama.cpp repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
@@ -279,6 +282,7 @@ jobs:
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
+            -DGGML_CUDA_CUB_3DOT2=ON \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -296,9 +300,9 @@ jobs:
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout llama.cpp repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: ggml-org/llama.cpp
           path: llama.cpp
@@ -392,7 +396,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Download amd64 CUDA artifact
         uses: ./.github/actions/download-artifact
         with:
