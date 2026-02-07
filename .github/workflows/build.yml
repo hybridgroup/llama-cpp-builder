@@ -166,7 +166,7 @@ jobs:
           apt update
           apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
       - name: Cache GCC 14.3.0
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-gcc
         with:
           path: /usr/local/gcc-14.3.0
@@ -242,7 +242,7 @@ jobs:
           apt update
           apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
       - name: Cache GCC 14.3.0
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-gcc
         with:
           path: /usr/local/gcc-14.3.0
@@ -316,7 +316,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip mesa-vulkan-drivers libxcb-xinput0 libxcb-xinerama0 libxcb-cursor-dev wget libgmp-dev libmpfr-dev libmpc-dev
       - name: Cache GCC 14.3.0
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-gcc-vulkan
         with:
           path: ./gcc-14.3.0
@@ -350,7 +350,7 @@ jobs:
         run: |
           echo "VULKAN_SDK_VERSION=1.4.335.0" >> "$GITHUB_ENV"
       - name: Use Vulkan SDK Cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: cache-sdk
         with:
           path: ./vulkan_sdk
