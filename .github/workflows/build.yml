@@ -366,6 +366,7 @@ jobs:
         run: |
           export CC=$GITHUB_WORKSPACE/gcc-14.3.0/bin/gcc-14
           export CXX=$GITHUB_WORKSPACE/gcc-14.3.0/bin/g++-14
+          export LD_LIBRARY_PATH=$GITHUB_WORKSPACE/gcc-14.3.0/lib64:$LD_LIBRARY_PATH
           source $GITHUB_WORKSPACE/vulkan_sdk/setup-env.sh
           cmake -S . -B build -G Ninja \
             -DCMAKE_INSTALL_RPATH='$ORIGIN' \
