@@ -1,6 +1,6 @@
 # llama.cpp - Ubuntu CUDA and Vulkan binaries
 
-This repo builds binary versions of `llama.cpp` for Ubuntu with CUDA and Vulkan support.
+This repo builds binary versions of `llama.cpp` for architectures that are not already part of the normal builds, such as Linux with CUDA or Vulkan support, and arm64 CPU or Vulkan.
 
 New releases are automatically built for the latest release version of `llama.cpp`.
 
@@ -30,3 +30,11 @@ Currently supported Vulkan build configurations:
 The prebuilt Vulkan SDK for ARM64 used for our builds comes from https://github.com/jakoch/vulkan-sdk-arm
 
 Thank you!
+
+## arm64 CPU
+
+Currently supported CPU build configurations:
+
+| CPU arch   | OS           |
+|--------|--------------|
+| arm64  | Ubuntu 22.04 |
