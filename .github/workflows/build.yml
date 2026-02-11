@@ -527,6 +527,17 @@ jobs:
         run: |
           unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
           mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64/*.tar.gz .
+      - name: Download arm64 CPU artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract arm64 CPU artifact
+        run: |
+          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64
+          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64/*.tar.gz .
       - name: Create final release
         uses: ncipollo/release-action@v1
         with:
