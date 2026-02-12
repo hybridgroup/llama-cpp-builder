@@ -29,7 +29,8 @@ Currently supported Vulkan build configurations:
 
 | CPU arch   | OS           | Vulkan  |
 |--------|--------------|-------|
-| arm64  | Ubuntu 22.04 | 1.4.328.1  |
+| arm64  | Ubuntu 22.04/Debian Bookworm | 1.4.328.1  |
+| arm64  | Ubuntu 24.04/Debian Trixie | 1.4.328.1  |
 
 The prebuilt Vulkan SDK for ARM64 used for our builds comes from https://github.com/jakoch/vulkan-sdk-arm
 
@@ -41,4 +42,5 @@ Currently supported CPU build configurations:
 
 | CPU arch   | OS           |
 |--------|--------------|
-| arm64  | Ubuntu 22.04 |
+| arm64  | Ubuntu 22.04/Debian Bookworm |
+| arm64  | Ubuntu 24.04/Debian Trixie |
