@@ -7,6 +7,9 @@ inputs:
   version:
     description: "Vulkan SDK version"
     required: true
+  osversion:
+    description: "OS version"
+    required: true
 
 runs:
   using: "composite"
@@ -15,7 +18,7 @@ runs:
       id: setup
       uses: ./.github/actions/unarchive-tar
       with:
-        url: https://github.com/jakoch/vulkan-sdk-arm/releases/download/${{ inputs.version }}/vulkansdk-ubuntu-22.04-arm-${{ inputs.version }}.tar.xz
+        url: https://github.com/jakoch/vulkan-sdk-arm/releases/download/${{ inputs.version }}/vulkansdk-ubuntu-${{ inputs.osversion }}-arm-${{ inputs.version }}.tar.xz
         path: ${{ inputs.path }}
         strip: 1
         filter: "${{ inputs.version }}/"
