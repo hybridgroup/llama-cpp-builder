@@ -38,5 +38,5 @@ runs:
         )
 
         set +x
-        curl -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ inputs.token }}" -L -o "${DESTINATION}.zip" "$DOWNLOAD_URL"
+        curl -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ inputs.token }}" -L -o "${DESTINATION}" "$DOWNLOAD_URL"
         set -x
