@@ -99,10 +99,11 @@ jobs:
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz
+          archive: false
 
   build-cuda-13-amd64:
     needs: check-version
@@ -153,10 +154,11 @@ jobs:
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz
+          archive: false
 
   build-cuda-arm64:
     needs: check-version
@@ -229,10 +231,11 @@ jobs:
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz
+          archive: false
 
   build-cuda-13-arm64:
     needs: check-version
@@ -305,10 +308,11 @@ jobs:
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
+          archive: false
 
   build-vulkan-arm64:
     needs: check-version
@@ -398,10 +402,11 @@ jobs:
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz
+          archive: false
 
   build-trixie-vulkan-arm64:
     needs: check-version
@@ -491,10 +496,11 @@ jobs:
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64.tar.gz
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64.tar.gz
+          archive: false
 
   build-cpu-arm64:
     needs: check-version
@@ -564,10 +570,11 @@ jobs:
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.tar.gz
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.tar.gz
+          archive: false
 
   build-trixie-cpu-arm64:
     needs: check-version
@@ -637,10 +644,11 @@ jobs:
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
       - name: Upload release binaries
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64.tar.gz
-          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64.tar.gz
+          archive: false
 
   release:
     needs: 
@@ -661,90 +669,58 @@ jobs:
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
-          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
-          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract amd64 CUDA artifact
-        run: |
-          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64
-          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64/*.tar.gz .
       - name: Download amd64 CUDA 13 artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
-          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64
-          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract amd64 CUDA artifact
-        run: |
-          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64
-          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64/*.tar.gz .
       - name: Download arm64 CUDA artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
-          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
-          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract arm64 CUDA artifact
-        run: |
-          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64
-          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64/*.tar.gz .
       - name: Download arm64 CUDA 13 artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
-          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64
-          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract arm64 CUDA artifact
-        run: |
-          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64
-          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64/*.tar.gz .
       - name: Download arm64 Vulkan artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
-          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
-          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract arm64 Vulkan artifact
-        run: |
-          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64
-          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64/*.tar.gz .
       - name: Download arm64 Vulkan trixie artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
-          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64
-          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract arm64 Vulkan trixie artifact
-        run: |
-          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64
-          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64/*.tar.gz .
       - name: Download arm64 CPU artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
-          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64
-          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract arm64 CPU artifact
-        run: |
-          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64
-          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64/*.tar.gz .
       - name: Download arm64 trixie CPU artifact
         uses: ./.github/actions/download-artifact
         with:
           run-id: ${{ github.run_id }}
-          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64
-          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract arm64 trixie CPU artifact
-        run: |
-          unzip llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64.zip -d llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64
-          mv llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64/*.tar.gz .
       - name: Create final release
         uses: ncipollo/release-action@v1
         with:
