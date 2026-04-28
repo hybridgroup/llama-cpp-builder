@@ -733,6 +733,17 @@ jobs:
             See the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/${{ needs.check-version.outputs.llama-tag }}) for details.
           artifacts: "*.tar.gz"
 
+  publish-version:
+    needs:
+      - check-version
+      - release
+    uses: ./.github/workflows/publish-version.yml
+    with:
+      tag_name: ${{ needs.check-version.outputs.llama-tag }}
+    permissions:
+      pages: write
+      id-token: write
+
   trigger-yzma-tests:
     needs: release
     runs-on: ubuntu-latest

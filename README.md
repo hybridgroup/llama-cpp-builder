@@ -1,4 +1,6 @@
-# llama.cpp Builder - Prebuilt binaries for CUDA and Vulkan on LInux
+# llama.cpp Builder
+
+## Prebuilt binaries for CUDA and Vulkan on Linux
 
 This repo builds binary versions of `llama.cpp` libraries and executables for architectures that are not already part of the normal builds, such as Linux with CUDA or Vulkan support, and Linux arm64 CPU or Vulkan.
 
