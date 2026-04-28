@@ -1,10 +1,10 @@
-# llama.cpp - Linux prebuilt binaries for CUDA and Vulkan
+# llama.cpp Builder - Prebuilt binaries for CUDA and Vulkan on LInux
 
 This repo builds binary versions of `llama.cpp` libraries and executables for architectures that are not already part of the normal builds, such as Linux with CUDA or Vulkan support, and Linux arm64 CPU or Vulkan.
 
 New releases are automatically built for the latest release version of `llama.cpp`. The latest release is checked once per hour.
 
-[![yzma logo](https://raw.githubusercontent.com/hybridgroup/yzma/refs/heads/main/images/yzma_logo.png)](https://github.com/hybridgroup/yzma)
+[![yzma logo](https://raw.githubusercontent.com/hybridgroup/yzma/refs/heads/main/images/yzma-logo-full-color-small.png)](https://github.com/hybridgroup/yzma)
 
 Used by [yzma](https://github.com/hybridgroup/yzma) installer. yzma lets you write Go applications that directly integrate the latest `llama.cpp` libraries.
 
@@ -44,3 +44,9 @@ Currently supported CPU build configurations:
 |--------|--------------|
 | arm64  | Ubuntu 22.04/Debian Bookworm |
 | arm64  | Ubuntu 24.04/Debian Trixie |
+
+## How to check the latest version
+
+```
+VERSION=$(curl -s https://hybridgroup.github.io/llama-cpp-builder/version.json | jq -r '.tag_name')
+```
