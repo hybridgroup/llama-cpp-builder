@@ -190,7 +190,7 @@ jobs:
       - name: Build GCC 14.3.0
         if: steps.cache-gcc.outputs.cache-hit != 'true'
         run: |
-          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
           tar -xf gcc-14.3.0.tar.gz
           cd gcc-14.3.0
           ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
@@ -266,7 +266,7 @@ jobs:
       - name: Build GCC 14.3.0
         if: steps.cache-gcc.outputs.cache-hit != 'true'
         run: |
-          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
           tar -xf gcc-14.3.0.tar.gz
           cd gcc-14.3.0
           ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
@@ -342,7 +342,7 @@ jobs:
         run: |
           mkdir -p gcc-install
           cd gcc-install
-          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
           tar -xf gcc-14.3.0.tar.gz
           cd gcc-14.3.0
           ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=$GITHUB_WORKSPACE/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
@@ -435,7 +435,7 @@ jobs:
         run: |
           mkdir -p gcc-install
           cd gcc-install
-          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
           tar -xf gcc-14.3.0.tar.gz
           cd gcc-14.3.0
           ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=$GITHUB_WORKSPACE/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
@@ -527,7 +527,7 @@ jobs:
         run: |
           mkdir -p gcc-install
           cd gcc-install
-          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
           tar -xf gcc-14.3.0.tar.gz
           cd gcc-14.3.0
           ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=$GITHUB_WORKSPACE/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
@@ -600,7 +600,7 @@ jobs:
         run: |
           mkdir -p gcc-install
           cd gcc-install
-          wget http://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
+          wget https://ftp.gnu.org/gnu/gcc/gcc-14.3.0/gcc-14.3.0.tar.gz
           tar -xf gcc-14.3.0.tar.gz
           cd gcc-14.3.0
           ./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=$GITHUB_WORKSPACE/gcc-14.3.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14
