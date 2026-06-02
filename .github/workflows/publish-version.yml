@@ -8,6 +8,7 @@ on:
         type: string
 
 permissions:
+  contents: read
   pages: write
   id-token: write
 
@@ -19,9 +20,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Create version JSON
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           mkdir -p _site
           printf '{"tag_name":"%s"}\n' "${{ inputs.tag_name }}" > _site/version.json
+          PREV_TAG=$(curl -sL -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/${{ github.repository }}/releases" | jq -r --arg current "${{ inputs.tag_name }}" '[.[].tag_name | select(. != $current)] | .[0]')
+          if [ "$PREV_TAG" = "null" ]; then PREV_TAG=""; fi
+          printf '{"tag_name":"%s"}\n' "$PREV_TAG" > _site/previous.json
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
