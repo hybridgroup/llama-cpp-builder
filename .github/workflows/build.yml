@@ -7,9 +7,10 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '15 * * * *'
+    - cron: '45 * * * *'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'schedule' && github.run_id || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -93,6 +94,9 @@ jobs:
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_APP=OFF \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -149,6 +153,9 @@ jobs:
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
             -DGGML_CUDA_CUB_3DOT2=ON \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_APP=OFF \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -226,6 +233,9 @@ jobs:
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_APP=OFF \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -304,6 +314,9 @@ jobs:
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_CUDA=ON \
             -DGGML_CUDA_CUB_3DOT2=ON \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_APP=OFF \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -398,6 +411,9 @@ jobs:
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_VULKAN=ON \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_APP=OFF \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -492,6 +508,9 @@ jobs:
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_VULKAN=ON \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_APP=OFF \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -566,6 +585,9 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_APP=OFF \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
@@ -640,6 +662,9 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
+            -DLLAMA_BUILD_SERVER=OFF \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_APP=OFF \
             -DGGML_BACKEND_DL=ON
           cmake --build build --config Release -j $(nproc)
       - name: Pack artifacts
