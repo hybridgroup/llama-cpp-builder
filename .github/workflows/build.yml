@@ -753,6 +753,7 @@ jobs:
         with:
           tag: ${{ needs.check-version.outputs.llama-tag }}
           commit: main
+          makeLatest: true
           body: |
             ## Changes in llama.cpp ${{ needs.check-version.outputs.llama-tag }}
             See the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/${{ needs.check-version.outputs.llama-tag }}) for details.
