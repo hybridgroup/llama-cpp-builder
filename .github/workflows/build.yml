@@ -89,7 +89,7 @@ jobs:
             -DCMAKE_INSTALL_RPATH='$ORIGIN' \
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
-            -DCMAKE_CUDA_ARCHITECTURES="86;89" \
+            -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90" \
             -DCMAKE_DISABLE_FIND_PACKAGE_NCCL=ON \
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
@@ -147,7 +147,7 @@ jobs:
             -DCMAKE_INSTALL_RPATH='$ORIGIN' \
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" \
-            -DCMAKE_CUDA_ARCHITECTURES="86;89" \
+            -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90" \
             -DCMAKE_DISABLE_FIND_PACKAGE_NCCL=ON \
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
