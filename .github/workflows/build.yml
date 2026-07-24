@@ -22,21 +22,13 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v6
-      - name: Checkout llama.cpp repo
-        uses: actions/checkout@v6
-        with:
-          repository: ggml-org/llama.cpp
-          path: llama.cpp
-          fetch-tags: 'true'
-      - name: Fetch llama tags
-        run: |
-          cd llama.cpp
-          git fetch --prune --prune-tags --unshallow --no-recurse-submodules
-      - name: Determine llama.cpp tag name
+      - name: Fetch latest llama.cpp release
         id: llamatag
-        uses: ./.github/actions/get-tag-name
-        with:
-          repo-path: ./llama.cpp
+        run: |
+          LLAMA_TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/ggml-org/llama.cpp/releases/latest \
+            | jq -r '.tag_name')
+          echo "name=${LLAMA_TAG}" >> "$GITHUB_OUTPUT"
       - name: Fetch tags
         run: |
           git fetch --prune --prune-tags --unshallow --no-recurse-submodules
