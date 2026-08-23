@@ -20,23 +20,27 @@ jobs:
       llama-tag: ${{ steps.tags.outputs.llama-tag }}
       current-tag: ${{ steps.tags.outputs.current-tag }}
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v6
       - name: Fetch latest llama.cpp release
         id: llamatag
         run: |
           LLAMA_TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/ggml-org/llama.cpp/releases/latest \
-            | jq -r '.tag_name')
+            "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=100" \
+            | jq -r '[.[] | select(.draft == false)] | sort_by(.published_at) | last | .tag_name')
+          if [ -z "$LLAMA_TAG" ] || [ "$LLAMA_TAG" = "null" ]; then
+            echo "No llama.cpp release found"
+            exit 1
+          fi
+          echo "Found llama.cpp tag: $LLAMA_TAG"
           echo "name=${LLAMA_TAG}" >> "$GITHUB_OUTPUT"
-      - name: Fetch tags
-        run: |
-          git fetch --prune --prune-tags --unshallow --no-recurse-submodules
-      - name: Determine own tag name
+      - name: Fetch latest own release
         id: currenttag
-        uses: ./.github/actions/get-tag-name
-        with:
-          repo-path: .
+        run: |
+          CURRENT_TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" \
+            | jq -r '[.[] | select(.draft == false)] | sort_by(.published_at) | last | .tag_name')
+          if [ "$CURRENT_TAG" = "null" ]; then CURRENT_TAG=""; fi
+          echo "Found own tag: $CURRENT_TAG"
+          echo "name=${CURRENT_TAG}" >> "$GITHUB_OUTPUT"
       - name: Save tags
         id: tags
         run: |
