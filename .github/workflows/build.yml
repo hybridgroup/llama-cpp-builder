@@ -16,10 +16,30 @@ concurrency:
 jobs:
   check-version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     outputs:
       llama-tag: ${{ steps.tags.outputs.llama-tag }}
       current-tag: ${{ steps.tags.outputs.current-tag }}
+      should-build: ${{ steps.tags.outputs.should-build }}
     steps:
+      - name: Check for a build in progress
+        id: inflight
+        run: |
+          # Ignore runs older than the 6 hour job limit, so a stuck run cannot
+          # block every later build.
+          # https://docs.github.com/actions/reference/limits
+          CUTOFF=$(date -u -d '6 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          COUNT=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/build.yml/runs?branch=main&per_page=100" \
+            | jq --arg id "${{ github.run_id }}" --arg cutoff "$CUTOFF" \
+              '[.workflow_runs[]
+                | select(.status != "completed")
+                | select(.created_at > $cutoff)
+                | select(.id < ($id | tonumber))] | length')
+          echo "Builds in progress: $COUNT"
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
       - name: Fetch latest llama.cpp release
         id: llamatag
         run: |
@@ -44,12 +64,23 @@ jobs:
       - name: Save tags
         id: tags
         run: |
-          echo "llama-tag=${{ steps.llamatag.outputs.name }}" >> "$GITHUB_OUTPUT"
-          echo "current-tag=${{ steps.currenttag.outputs.name }}" >> "$GITHUB_OUTPUT"
+          LLAMA_TAG="${{ steps.llamatag.outputs.name }}"
+          CURRENT_TAG="${{ steps.currenttag.outputs.name }}"
+          SHOULD_BUILD=true
+          if [ "${{ steps.inflight.outputs.count }}" -gt 0 ]; then
+            echo "A build is already in progress, skip this run"
+            SHOULD_BUILD=false
+          elif [ "$LLAMA_TAG" = "$CURRENT_TAG" ]; then
+            echo "Release $LLAMA_TAG is current, skip this run"
+            SHOULD_BUILD=false
+          fi
+          echo "llama-tag=${LLAMA_TAG}" >> "$GITHUB_OUTPUT"
+          echo "current-tag=${CURRENT_TAG}" >> "$GITHUB_OUTPUT"
+          echo "should-build=${SHOULD_BUILD}" >> "$GITHUB_OUTPUT"
 
   build-cuda-amd64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-latest
     container:
       image: nvidia/cuda:12.9.1-devel-ubuntu24.04
@@ -107,7 +138,7 @@ jobs:
 
   build-cuda-13-amd64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-latest
     container:
       image: nvidia/cuda:13.0.2-devel-ubuntu24.04
@@ -166,7 +197,7 @@ jobs:
 
   build-cuda-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-22.04-arm
     container: 
       image: nvidia/cuda:12.9.1-devel-ubuntu22.04
@@ -246,7 +277,7 @@ jobs:
 
   build-cuda-13-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-22.04-arm
     container:
       image: nvidia/cuda:13.0.2-devel-ubuntu22.04
@@ -327,7 +358,7 @@ jobs:
 
   build-vulkan-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Check out the repo
@@ -424,7 +455,7 @@ jobs:
 
   build-trixie-vulkan-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Check out the repo
@@ -521,7 +552,7 @@ jobs:
 
   build-cpu-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-22.04-arm
     steps:
       - name: Check out the repo
@@ -598,7 +629,7 @@ jobs:
 
   build-trixie-cpu-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Check out the repo
@@ -675,7 +706,7 @@ jobs:
 
   build-trixie-opencl-arm64:
     needs: check-version
-    if: ${{ needs.check-version.outputs.llama-tag != needs.check-version.outputs.current-tag }}
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Check out the repo
