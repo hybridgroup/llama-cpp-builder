@@ -43,6 +43,20 @@ instead of a wrong result.
 The list of exported functions is not written twice: `build.sh` reads it out of
 `yzma_wasm.cpp`.
 
+## Threads
+
+The build with threads takes the size of its pool from JavaScript, with
+`-sPTHREAD_POOL_SIZE=Module.pthreadPoolSize`, so the pool follows the machine
+instead of a number chosen here. The glue in yzma sets it from the number of
+cores.
+
+A pool that is too small is worse than a small number of threads: llama.cpp then
+waits for threads that cannot start, because the thread that would start them is
+busy computing.
+
+Note the dot: `Module["pthreadPoolSize"]` does not survive the trip through
+CMake to the linker, whichever kind of quotes it wears.
+
 ## The multimodal library
 
 Every build has mtmd, the multimodal library of llama.cpp, which gives a model

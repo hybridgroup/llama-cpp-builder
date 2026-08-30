@@ -593,7 +593,8 @@ void yzma_sampler_free(int smpl) {
 //
 
 // yzma_mtmd_init_from_file loads the projector of a multimodal model.
-int yzma_mtmd_init_from_file(const char * mmproj_path, int model, int n_threads, int use_gpu) {
+int yzma_mtmd_init_from_file(const char * mmproj_path, int model, int n_threads, int use_gpu,
+                            int image_min_tokens, int image_max_tokens) {
     llama_model * m = models.get(model);
     if (m == nullptr) {
         set_error("invalid model handle %d", model);
@@ -603,8 +604,21 @@ int yzma_mtmd_init_from_file(const char * mmproj_path, int model, int n_threads,
     mtmd_context_params params = mtmd_context_params_default();
     params.print_timings = false;
     params.use_gpu       = use_gpu != 0;
+
+    // The default of mtmd is four threads whatever the machine has, and putting
+    // an image through a projector is the slowest part of an answer, so a caller
+    // that knows the number of cores should say so.
     if (n_threads > 0) {
         params.n_threads = n_threads;
+    }
+
+    // A model with a resolution that changes makes more tokens for a larger
+    // image. Fewer tokens is less work.
+    if (image_min_tokens > 0) {
+        params.image_min_tokens = image_min_tokens;
+    }
+    if (image_max_tokens > 0) {
+        params.image_max_tokens = image_max_tokens;
     }
 
     mtmd_context * mctx = mtmd_init_from_file(mmproj_path, m, params);
