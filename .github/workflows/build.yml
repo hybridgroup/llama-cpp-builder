@@ -783,6 +783,70 @@ jobs:
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-opencl-arm64.tar.gz
           archive: false
 
+  # build-wasm makes the WebAssembly build that yzma uses in a browser, through
+  # its pkg/llamawasm package. It shares nothing with the native jobs: no GCC
+  # from source, no GPU SDK, and the output is yzma_wasm.js and yzma_wasm.wasm
+  # instead of a set of dlopen libraries.
+  build-wasm:
+    needs: check-version
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      EMSDK_VERSION: 6.0.8
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+      - name: Checkout llama.cpp repo
+        uses: actions/checkout@v6
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
+          ref: ${{ needs.check-version.outputs.llama-tag }}
+          fetch-tags: 'true'
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build git python3
+      - name: Cache Emscripten SDK
+        uses: actions/cache@v5
+        id: cache-emsdk
+        with:
+          path: ./emsdk
+          key: emsdk-${{ env.EMSDK_VERSION }}-ubuntu-latest-v1
+      - name: Install Emscripten SDK
+        if: steps.cache-emsdk.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch ${EMSDK_VERSION} https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install ${EMSDK_VERSION}
+          ./emsdk activate ${EMSDK_VERSION}
+      - name: Build single thread
+        run: |
+          source ./emsdk/emsdk_env.sh
+          wasm/build.sh --llama-cpp "$GITHUB_WORKSPACE/llama.cpp" --out "$GITHUB_WORKSPACE/out/wasm-simd"
+      - name: Build multiple threads
+        run: |
+          source ./emsdk/emsdk_env.sh
+          wasm/build.sh --mt --llama-cpp "$GITHUB_WORKSPACE/llama.cpp" --out "$GITHUB_WORKSPACE/out/wasm-simd-mt"
+      - name: Pack artifacts
+        run: |
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./out/wasm-simd .
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./out/wasm-simd-mt .
+      - name: Upload release binaries
+        uses: actions/upload-artifact@v7
+        with:
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd.tar.gz
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd.tar.gz
+          archive: false
+      - name: Upload multiple thread release binaries
+        uses: actions/upload-artifact@v7
+        with:
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
+          archive: false
+
   release:
     needs: 
       - check-version
@@ -795,6 +859,7 @@ jobs:
       - build-cpu-arm64
       - build-trixie-cpu-arm64
       - build-trixie-opencl-arm64
+      - build-wasm
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
@@ -861,6 +926,20 @@ jobs:
           run-id: ${{ github.run_id }}
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-opencl-arm64.tar.gz
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-opencl-arm64.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download wasm artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download wasm multiple thread artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Create final release
         uses: ncipollo/release-action@v1
