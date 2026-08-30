@@ -40,6 +40,17 @@ set(LLAMA_BUILD_SERVER     OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_APP        OFF CACHE BOOL "" FORCE)
 set(LLAMA_CURL             OFF CACHE BOOL "" FORCE)
 
+# mtmd is the multimodal library of llama.cpp, and it lives under tools/, which
+# llama.cpp skips for an Emscripten build. LLAMA_BUILD_MTMD is the hook upstream
+# has for taking the library on its own, and it fires because LLAMA_BUILD_TOOLS
+# and LLAMA_BUILD_COMMON are both off, so this builds the library and none of the
+# programs of tools/.
+#
+# mtmd links only ggml and llama in public, so it needs nothing from the common
+# library of llama.cpp. Video needs a subprocess for ffmpeg, and llama.cpp turns
+# subprocesses off for Emscripten, which turns video off with them.
+set(LLAMA_BUILD_MTMD       ON  CACHE BOOL "" FORCE)
+
 # llama.cpp defaults to 64-bit memory for an Emscripten build. This build stays
 # with 32-bit memory, because a 64-bit build makes every pointer an i64, which
 # reaches JavaScript as a BigInt, and the Go code in pkg/llamawasm works with
@@ -55,7 +66,7 @@ set(GGML_WASM_SINGLE_FILE  OFF CACHE BOOL "" FORCE)
 add_subdirectory("${LLAMA_CPP_DIR}" llama.cpp EXCLUDE_FROM_ALL)
 
 add_executable(yzma_wasm yzma_wasm.cpp)
-target_link_libraries(yzma_wasm PRIVATE llama ggml)
+target_link_libraries(yzma_wasm PRIVATE llama ggml mtmd)
 
 # YZMA_WASM_EXPORTS and YZMA_WASM_LINK_FLAGS come from build.sh.
 if(DEFINED YZMA_WASM_EXPORTS)
