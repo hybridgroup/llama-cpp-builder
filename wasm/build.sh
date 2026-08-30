@@ -173,6 +173,10 @@ if [[ $webgpu -eq 1 ]]; then
         "yzma_encode"
         "yzma_get_embeddings_seq"
         "yzma_sampler_sample"
+        "yzma_mtmd_init_from_file"
+        "yzma_mtmd_free"
+        "yzma_mtmd_tokenize"
+        "yzma_mtmd_helper_eval_chunks"
     )
 
     # Each one must also be in the list of exported functions, which has the

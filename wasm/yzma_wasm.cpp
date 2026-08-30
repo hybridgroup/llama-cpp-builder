@@ -18,6 +18,8 @@
 
 #include "ggml-backend.h"
 #include "llama.h"
+#include "mtmd.h"
+#include "mtmd-helper.h"
 
 #include <cstdarg>
 #include <cstdio>
@@ -25,7 +27,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 2
+#define YZMA_ABI_VERSION 3
 
 // Error codes. These are also in the Go code.
 enum {
@@ -93,6 +95,9 @@ table<llama_model>              models;
 table<llama_context>            contexts;
 table<const llama_vocab>        vocabs;
 table<llama_sampler>            samplers;
+table<mtmd_context>             mtmd_contexts;
+table<mtmd_bitmap>              bitmaps;
+table<mtmd_input_chunks>        chunk_lists;
 
 // log_level holds the lowest level of message that goes to the console. A
 // value more than GGML_LOG_LEVEL_ERROR stops all messages.
@@ -256,6 +261,37 @@ int yzma_model_chat_template(int model, char * buf, int cap) {
         return YZMA_ERR_TOO_SMALL;
     }
     memcpy(buf, tmpl, (size_t) n + 1);
+    return n;
+}
+
+// yzma_chat_apply_template puts one message into the chat format of the model
+// and copies the result into buf.
+//
+// One message is enough for a prompt with a question about an image, which is
+// what the multimodal calls need. A chat with turns needs more than this.
+int yzma_chat_apply_template(int model, const char * role, const char * content,
+                             int add_assistant, char * buf, int cap) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+
+    const char * tmpl = llama_model_chat_template(m, nullptr);
+    if (tmpl == nullptr) {
+        set_error("model %d has no chat template", model);
+        return YZMA_ERR_GENERIC;
+    }
+
+    llama_chat_message message = { role, content };
+    const int32_t n = llama_chat_apply_template(tmpl, &message, 1, add_assistant != 0, buf, cap);
+    if (n > cap) {
+        return YZMA_ERR_TOO_SMALL;
+    }
+    if (n < 0) {
+        set_error("llama_chat_apply_template returned %d", n);
+        return YZMA_ERR_GENERIC;
+    }
     return n;
 }
 
@@ -541,6 +577,198 @@ void yzma_sampler_free(int smpl) {
     if (s != nullptr) {
         llama_sampler_free(s);
     }
+}
+
+//
+// multimodal
+//
+// These calls follow the mtmd library of llama.cpp. A program makes a bitmap
+// from the pixels of an image, puts the text and the bitmaps into a list of
+// chunks, and runs the chunks through the model. After that the generation loop
+// is the same as it is for text alone.
+//
+// The pixels must be RGB, three bytes for each one, with no padding between the
+// rows. A browser gets them from a canvas, so no image library goes into this
+// build.
+//
+
+// yzma_mtmd_init_from_file loads the projector of a multimodal model.
+int yzma_mtmd_init_from_file(const char * mmproj_path, int model, int n_threads, int use_gpu) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+
+    mtmd_context_params params = mtmd_context_params_default();
+    params.print_timings = false;
+    params.use_gpu       = use_gpu != 0;
+    if (n_threads > 0) {
+        params.n_threads = n_threads;
+    }
+
+    mtmd_context * mctx = mtmd_init_from_file(mmproj_path, m, params);
+    if (mctx == nullptr) {
+        set_error("cannot load the projector from %s", mmproj_path);
+        return YZMA_ERR_LOAD;
+    }
+    return mtmd_contexts.add(mctx);
+}
+
+void yzma_mtmd_free(int mctx) {
+    mtmd_context * c = mtmd_contexts.take(mctx);
+    if (c != nullptr) {
+        mtmd_free(c);
+    }
+}
+
+int yzma_mtmd_support_vision(int mctx) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    if (c == nullptr) {
+        set_error("invalid mtmd handle %d", mctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return mtmd_support_vision(c) ? 1 : 0;
+}
+
+int yzma_mtmd_support_audio(int mctx) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    if (c == nullptr) {
+        set_error("invalid mtmd handle %d", mctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return mtmd_support_audio(c) ? 1 : 0;
+}
+
+// yzma_mtmd_get_marker copies the marker that stands for a piece of media in
+// the text of a prompt.
+int yzma_mtmd_get_marker(int mctx, char * buf, int cap) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    if (c == nullptr) {
+        set_error("invalid mtmd handle %d", mctx);
+        return YZMA_ERR_HANDLE;
+    }
+
+    const char * marker = mtmd_get_marker(c);
+    if (marker == nullptr) {
+        return 0;
+    }
+
+    const int n = (int) strlen(marker);
+    if (cap < n + 1) {
+        return YZMA_ERR_TOO_SMALL;
+    }
+    memcpy(buf, marker, (size_t) n + 1);
+    return n;
+}
+
+// yzma_mtmd_bitmap_init makes a bitmap from RGB pixels, three bytes for each
+// one.
+int yzma_mtmd_bitmap_init(int nx, int ny, const unsigned char * data) {
+    if (nx <= 0 || ny <= 0 || data == nullptr) {
+        set_error("a bitmap needs a size and data: %d by %d", nx, ny);
+        return YZMA_ERR_GENERIC;
+    }
+
+    mtmd_bitmap * bitmap = mtmd_bitmap_init((uint32_t) nx, (uint32_t) ny, data);
+    if (bitmap == nullptr) {
+        set_error("cannot make a bitmap of %d by %d", nx, ny);
+        return YZMA_ERR_ALLOC;
+    }
+    return bitmaps.add(bitmap);
+}
+
+void yzma_mtmd_bitmap_free(int bitmap) {
+    mtmd_bitmap * b = bitmaps.take(bitmap);
+    if (b != nullptr) {
+        mtmd_bitmap_free(b);
+    }
+}
+
+int yzma_mtmd_input_chunks_init(void) {
+    mtmd_input_chunks * chunks = mtmd_input_chunks_init();
+    if (chunks == nullptr) {
+        set_error("cannot make a list of chunks");
+        return YZMA_ERR_ALLOC;
+    }
+    return chunk_lists.add(chunks);
+}
+
+void yzma_mtmd_input_chunks_free(int chunks) {
+    mtmd_input_chunks * c = chunk_lists.take(chunks);
+    if (c != nullptr) {
+        mtmd_input_chunks_free(c);
+    }
+}
+
+int yzma_mtmd_input_chunks_size(int chunks) {
+    mtmd_input_chunks * c = chunk_lists.get(chunks);
+    if (c == nullptr) {
+        set_error("invalid chunks handle %d", chunks);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) mtmd_input_chunks_size(c);
+}
+
+// yzma_mtmd_tokenize puts the text and the bitmaps into the list of chunks. The
+// text must hold one marker for each bitmap. bitmap_handles points to n_bitmaps
+// handles that came from yzma_mtmd_bitmap_init.
+int yzma_mtmd_tokenize(int mctx, int chunks, const char * text, int text_len,
+                       int add_special, int parse_special,
+                       const int * bitmap_handles, int n_bitmaps) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    mtmd_input_chunks * out = chunk_lists.get(chunks);
+    if (c == nullptr || out == nullptr) {
+        set_error("invalid handle: mtmd %d, chunks %d", mctx, chunks);
+        return YZMA_ERR_HANDLE;
+    }
+
+    std::vector<const mtmd_bitmap *> media;
+    media.reserve((size_t) (n_bitmaps > 0 ? n_bitmaps : 0));
+    for (int i = 0; i < n_bitmaps; i++) {
+        mtmd_bitmap * b = bitmaps.get(bitmap_handles[i]);
+        if (b == nullptr) {
+            set_error("invalid bitmap handle %d", bitmap_handles[i]);
+            return YZMA_ERR_HANDLE;
+        }
+        media.push_back(b);
+    }
+
+    mtmd_input_text input = {};
+    input.text          = text;
+    input.text_len      = (size_t) text_len;
+    input.add_special   = add_special != 0;
+    input.parse_special = parse_special != 0;
+
+    const int rc = mtmd_tokenize(c, out, &input, media.data(), media.size());
+    if (rc != 0) {
+        set_error("mtmd_tokenize returned %d", rc);
+    }
+    return rc;
+}
+
+// yzma_mtmd_helper_eval_chunks runs every chunk through the model: the text
+// with llama_decode, and the media through the projector first. It returns the
+// position after the last chunk.
+int yzma_mtmd_helper_eval_chunks(int mctx, int ctx, int chunks, int n_past, int seq_id,
+                                 int n_batch, int logits_last) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    llama_context * lctx = contexts.get(ctx);
+    mtmd_input_chunks * list = chunk_lists.get(chunks);
+    if (c == nullptr || lctx == nullptr || list == nullptr) {
+        set_error("invalid handle: mtmd %d, context %d, chunks %d", mctx, ctx, chunks);
+        return YZMA_ERR_HANDLE;
+    }
+
+    llama_pos new_n_past = 0;
+    const int rc = mtmd_helper_eval_chunks(c, lctx, list, (llama_pos) n_past,
+                                           (llama_seq_id) seq_id, n_batch,
+                                           logits_last != 0, &new_n_past);
+    if (rc != 0) {
+        set_error("mtmd_helper_eval_chunks returned %d", rc);
+        return YZMA_ERR_GENERIC;
+    }
+    return (int) new_n_past;
 }
 
 } // extern "C"

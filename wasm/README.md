@@ -29,6 +29,7 @@ The generation loop stays in Go: one `yzma_decode` and one
 | --- | --- |
 | 1 | The calls for text generation and embeddings. |
 | 2 | `yzma_gpu_device`, which names the device that is not the CPU. |
+| 3 | The multimodal calls, `yzma_mtmd_*`, and `yzma_chat_apply_template`. |
 
 `pkg/llamawasm` drives every version from 1 up to the one it knows, and tests
 for a call before it uses it, so a new yzma still works with the modules of an
@@ -41,6 +42,23 @@ instead of a wrong result.
 
 The list of exported functions is not written twice: `build.sh` reads it out of
 `yzma_wasm.cpp`.
+
+## The multimodal library
+
+Every build has mtmd, the multimodal library of llama.cpp, which gives a model
+its eyes. It lives under `tools/` in llama.cpp, and llama.cpp skips that whole
+directory for an Emscripten build, so `wasm/CMakeLists.txt` turns on
+`LLAMA_BUILD_MTMD`. That is the hook upstream has for taking the library on its
+own, and it fires because the programs of `tools/` stay off. mtmd needs nothing
+from the common library of llama.cpp.
+
+The shim takes the pixels of an image and not a file: `yzma_mtmd_bitmap_init`
+wants RGB, three bytes for each pixel. A browser decodes the image with a canvas,
+so the helpers of mtmd that read a file are not in the interface and no image
+library goes into the build. Audio and video are out as well: video needs ffmpeg
+in a subprocess, which llama.cpp turns off for Emscripten anyway.
+
+mtmd adds about 700 KB to each build.
 
 ## Build
 
