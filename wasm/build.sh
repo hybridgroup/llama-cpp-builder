@@ -89,7 +89,7 @@ link_flags=(
     "-sALLOW_MEMORY_GROWTH=1"
     "-sMAXIMUM_MEMORY=4294967296"
     "-sINITIAL_MEMORY=134217728"
-    "-sSTACK_SIZE=1048576"
+    "-sSTACK_SIZE=5242880"
     "-sFORCE_FILESYSTEM=1"
     "-sEXIT_RUNTIME=0"
     "-sASSERTIONS=0"
@@ -107,7 +107,18 @@ if [[ $mt -eq 1 ]]; then
     # A multiple thread build needs SharedArrayBuffer, which a browser gives
     # only to a page that sets the COOP and COEP headers. The JavaScript glue
     # tests for this and takes the single thread build if it is not available.
-    link_flags+=("-pthread" "-sSHARED_MEMORY=1" "-sPTHREAD_POOL_SIZE=8" "-sPROXY_TO_PTHREAD=0")
+    # The JavaScript glue sets Module.pthreadPoolSize to the number of cores of
+    # the machine, so the pool follows the machine instead of a number chosen
+    # here. A pool that is too small makes llama.cpp wait for threads that
+    # cannot start, because the thread that would start them is busy computing.
+    link_flags+=(
+        "-pthread"
+        "-sSHARED_MEMORY=1"
+        # Dot access and not Module["pthreadPoolSize"]: quotes of either kind do
+        # not survive the trip through CMake to the linker.
+        "-sPTHREAD_POOL_SIZE=Module.pthreadPoolSize"
+        "-sPROXY_TO_PTHREAD=0"
+    )
     compile_flags+=("-pthread")
 fi
 

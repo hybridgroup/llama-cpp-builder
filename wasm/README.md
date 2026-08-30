@@ -30,6 +30,7 @@ The generation loop stays in Go: one `yzma_decode` and one
 | 1 | The calls for text generation and embeddings. |
 | 2 | `yzma_gpu_device`, which names the device that is not the CPU. |
 | 3 | The multimodal calls, `yzma_mtmd_*`, and `yzma_chat_apply_template`. |
+| 4 | `yzma_mtmd_init_from_file` also takes the bounds of the tokens of an image. |
 
 `pkg/llamawasm` drives every version from 1 up to the one it knows, and tests
 for a call before it uses it, so a new yzma still works with the modules of an
@@ -42,6 +43,20 @@ instead of a wrong result.
 
 The list of exported functions is not written twice: `build.sh` reads it out of
 `yzma_wasm.cpp`.
+
+## Threads
+
+The build with threads takes the size of its pool from JavaScript, with
+`-sPTHREAD_POOL_SIZE=Module.pthreadPoolSize`, so the pool follows the machine
+instead of a number chosen here. The glue in yzma sets it from the number of
+cores.
+
+A pool that is too small is worse than a small number of threads: llama.cpp then
+waits for threads that cannot start, because the thread that would start them is
+busy computing.
+
+Note the dot: `Module["pthreadPoolSize"]` does not survive the trip through
+CMake to the linker, whichever kind of quotes it wears.
 
 ## The multimodal library
 
