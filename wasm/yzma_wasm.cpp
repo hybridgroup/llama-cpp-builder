@@ -16,6 +16,7 @@
 // Increase YZMA_ABI_VERSION each time you change this interface. The Go code
 // compares the value at startup and refuses a module that does not match.
 
+#include "ggml-backend.h"
 #include "llama.h"
 
 #include <cstdarg>
@@ -24,7 +25,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 1
+#define YZMA_ABI_VERSION 2
 
 // Error codes. These are also in the Go code.
 enum {
@@ -127,6 +128,39 @@ int yzma_last_error(char * buf, int cap) {
 void yzma_log_set_verbosity(int level) {
     log_level = level;
     llama_log_set(log_callback, nullptr);
+}
+
+// yzma_gpu_device copies the name of the first device that is not the CPU into
+// buf and returns the number of bytes copied. The return value is 0 if
+// llama.cpp has no device other than the CPU, which is what a build for the CPU
+// always reports.
+//
+// A page can ask for WebGPU and still land on the CPU: the backend of llama.cpp
+// gives no device if the adapter of the browser has no support for f16 shaders.
+// This call says what llama.cpp really has, and not what the browser has.
+int yzma_gpu_device(char * buf, int cap) {
+    const size_t count = ggml_backend_dev_count();
+
+    for (size_t i = 0; i < count; i++) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        if (dev == nullptr || ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU) {
+            continue;
+        }
+
+        const char * name = ggml_backend_dev_name(dev);
+        if (name == nullptr) {
+            continue;
+        }
+
+        const int n = (int) strlen(name);
+        if (cap < n + 1) {
+            return YZMA_ERR_TOO_SMALL;
+        }
+        memcpy(buf, name, (size_t) n + 1);
+        return n;
+    }
+
+    return 0;
 }
 
 void yzma_backend_init(void) {

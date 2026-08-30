@@ -830,10 +830,30 @@ jobs:
         run: |
           source ./emsdk/emsdk_env.sh
           wasm/build.sh --mt --llama-cpp "$GITHUB_WORKSPACE/llama.cpp" --out "$GITHUB_WORKSPACE/out/wasm-simd-mt"
+      # The WebGPU backend of llama.cpp follows one commit of Dawn, so the
+      # emdawnwebgpu package is pinned. wasm/build.sh holds the tag, and it
+      # downloads the package itself if the cache has none.
+      - name: Read the pinned Dawn tag
+        id: dawn
+        run: |
+          TAG=$(sed -n 's/^DAWN_TAG="${DAWN_TAG:-\(.*\)}"$/\1/p' wasm/build.sh)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "emdawnwebgpu tag: $TAG"
+      - name: Cache emdawnwebgpu
+        uses: actions/cache@v5
+        id: cache-emdawn
+        with:
+          path: ./build-wasm/emdawnwebgpu_pkg
+          key: emdawnwebgpu-${{ steps.dawn.outputs.tag }}-v1
+      - name: Build WebGPU
+        run: |
+          source ./emsdk/emsdk_env.sh
+          wasm/build.sh --webgpu --llama-cpp "$GITHUB_WORKSPACE/llama.cpp" --out "$GITHUB_WORKSPACE/out/wasm-webgpu"
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./out/wasm-simd .
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./out/wasm-simd-mt .
+          tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-webgpu.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./out/wasm-webgpu .
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -845,6 +865,12 @@ jobs:
         with:
           path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
+          archive: false
+      - name: Upload WebGPU release binaries
+        uses: actions/upload-artifact@v7
+        with:
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-webgpu.tar.gz
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-webgpu.tar.gz
           archive: false
 
   release:
@@ -940,6 +966,13 @@ jobs:
           run-id: ${{ github.run_id }}
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download wasm WebGPU artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-webgpu.tar.gz
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-webgpu.tar.gz
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Create final release
         uses: ncipollo/release-action@v1
