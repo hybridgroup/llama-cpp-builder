@@ -18,12 +18,14 @@ Currently supported CUDA build configurations:
 |--------|--------------|-------|---------|
 | amd64  | Ubuntu 24.04      | 12.9  | 75, 80, 86, 89, 90  |
 | amd64  | Ubuntu 24.04      | 13.0.88  | 75, 80, 86, 89, 90  |
-| arm64  | Ubuntu 22.04      | 12.9  | 87  |
-| arm64  | Ubuntu 22.04      | 13.0.88  | 87  |
+| arm64  | Ubuntu 22.04      | 12.9  | 87, 121  |
+| arm64  | Ubuntu 22.04      | 13.0.88  | 87, 121  |
 
 Compute architectures `86` and `89` are those used by consumer video cards.
 
 Compute architecture `87` is used by Jetson Orin and Jetson AGX.
+
+Compute architecture `121` is used by the GB10 superchip in the NVIDIA DGX Spark.
 
 ## Vulkan
 
