@@ -149,6 +149,33 @@ Each build job hashes its own output before it packs it, so the file digests cos
 download. Only this repo builds its assets, so an asset from `ggml-org/llama.cpp` has
 `sha256` but no `files`. A client must accept an asset that has no `files`.
 
+### How to check a download
+
+Get the manifest for the tag, then compare the archive with the digest for its source:
+
+```
+TAG=b10783
+ASSET=llama-$TAG-bin-ubuntu-cpu-arm64.tar.gz
+curl -sO https://hybridgroup.github.io/llama-cpp-builder/digests/$TAG.json
+curl -sLO https://github.com/hybridgroup/llama-cpp-builder/releases/download/$TAG/$ASSET
+
+WANT=$(jq -r --arg a "$ASSET" \
+  '.sources["hybridgroup/llama-cpp-builder"].assets[$a].sha256' $TAG.json)
+echo "$WANT  $ASSET" | sha256sum -c
+```
+
+To check an installation after the archive is gone, compare the files in the library
+directory:
+
+```
+jq -r --arg a "$ASSET" \
+  '.sources["hybridgroup/llama-cpp-builder"].assets[$a].files
+   | to_entries[] | "\(.value)  \(.key)"' $TAG.json > sums.txt
+(cd /path/to/lib && sha256sum -c /path/to/sums.txt)
+```
+
+### Where the manifests live
+
 The manifests are in [digests/](./digests) in this repo, and the release workflow copies
 them to the site. A manifest is written one time and is not rewritten. The manifests that
 seeded the directory hold only `sha256`, because their releases are older than the build
