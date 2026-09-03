@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 4
+#define YZMA_ABI_VERSION 5
 
 // Error codes. These are also in the Go code.
 enum {
@@ -60,18 +60,33 @@ void set_error(const char * fmt, ...) {
 
 // table holds objects of one type and gives each one an int32 handle. Handle 0
 // is never used, so 0 is always an invalid handle.
+//
+// A handle is borrowed if another object owns the item. yzma_sampler_chain_get
+// makes one, because the chain frees the samplers in it. The shim must not free
+// a borrowed item.
 template <typename T>
 struct table {
     std::vector<T *> items;
+    std::vector<bool> borrowed;
 
     int add(T * item) {
+        return insert(item, false);
+    }
+
+    int add_borrowed(T * item) {
+        return insert(item, true);
+    }
+
+    int insert(T * item, bool other_owner) {
         for (size_t i = 0; i < items.size(); i++) {
             if (items[i] == nullptr) {
                 items[i] = item;
+                borrowed[i] = other_owner;
                 return (int) i + 1;
             }
         }
         items.push_back(item);
+        borrowed.push_back(other_owner);
         return (int) items.size();
     }
 
@@ -82,10 +97,18 @@ struct table {
         return items[handle - 1];
     }
 
+    bool is_borrowed(int handle) const {
+        if (handle < 1 || (size_t) handle > items.size()) {
+            return false;
+        }
+        return borrowed[handle - 1];
+    }
+
     T * take(int handle) {
         T * item = get(handle);
         if (item != nullptr) {
             items[handle - 1] = nullptr;
+            borrowed[handle - 1] = false;
         }
         return item;
     }
@@ -98,6 +121,40 @@ table<llama_sampler>            samplers;
 table<mtmd_context>             mtmd_contexts;
 table<mtmd_bitmap>              bitmaps;
 table<mtmd_input_chunks>        chunk_lists;
+
+// split_strings makes a vector of pointers into a buffer that holds n strings
+// with a NUL byte after each one. A pointer to an array of pointers cannot
+// cross the boundary, thus the Go side sends a list of strings in this shape.
+std::vector<const char *> split_strings(const char * blob, int n) {
+    std::vector<const char *> out;
+    if (blob == nullptr || n <= 0) {
+        return out;
+    }
+
+    out.reserve((size_t) n);
+    const char * p = blob;
+    for (int i = 0; i < n; i++) {
+        out.push_back(p);
+        p += strlen(p) + 1;
+    }
+    return out;
+}
+
+// copy_text puts a string of llama.cpp into buf with a NUL byte after it. It
+// gives the number of bytes of the text, or YZMA_ERR_TOO_SMALL if buf is too
+// small.
+int copy_text(const char * text, char * buf, int cap) {
+    if (text == nullptr) {
+        return 0;
+    }
+
+    const int n = (int) strlen(text);
+    if (cap < n + 1) {
+        return YZMA_ERR_TOO_SMALL;
+    }
+    memcpy(buf, text, (size_t) n + 1);
+    return n;
+}
 
 // log_level holds the lowest level of message that goes to the console. A
 // value more than GGML_LOG_LEVEL_ERROR stops all messages.
@@ -427,6 +484,213 @@ int yzma_vocab_get_add_bos(int vocab) {
     return llama_vocab_get_add_bos(v) ? 1 : 0;
 }
 
+// yzma_vocab_eot gives the token that ends a turn.
+int yzma_vocab_eot(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_eot(v);
+}
+
+// yzma_vocab_sep gives the token that separates two sentences.
+int yzma_vocab_sep(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_sep(v);
+}
+
+// yzma_vocab_nl gives the token of a new line.
+int yzma_vocab_nl(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_nl(v);
+}
+
+// yzma_vocab_pad gives the token that fills a batch.
+int yzma_vocab_pad(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_pad(v);
+}
+
+// yzma_vocab_mask gives the token that hides a position.
+int yzma_vocab_mask(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_mask(v);
+}
+
+// yzma_vocab_fim_pre gives the token before the text of a fill in the middle prompt.
+int yzma_vocab_fim_pre(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_fim_pre(v);
+}
+
+// yzma_vocab_fim_suf gives the token after the text of a fill in the middle prompt.
+int yzma_vocab_fim_suf(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_fim_suf(v);
+}
+
+// yzma_vocab_fim_mid gives the token of the middle of a fill in the middle prompt.
+int yzma_vocab_fim_mid(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_fim_mid(v);
+}
+
+// yzma_vocab_fim_pad gives the token that fills a fill in the middle prompt.
+int yzma_vocab_fim_pad(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_fim_pad(v);
+}
+
+// yzma_vocab_fim_rep gives the token of the repository of a fill in the middle prompt.
+int yzma_vocab_fim_rep(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_fim_rep(v);
+}
+
+// yzma_vocab_fim_sep gives the token that separates the files of a fill in the middle prompt.
+int yzma_vocab_fim_sep(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_fim_sep(v);
+}
+
+int yzma_vocab_get_add_eos(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_get_add_eos(v) ? 1 : 0;
+}
+
+int yzma_vocab_get_add_sep(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_get_add_sep(v) ? 1 : 0;
+}
+
+int yzma_vocab_is_control(int vocab, int token) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_vocab_is_control(v, (llama_token) token) ? 1 : 0;
+}
+
+// yzma_vocab_get_attr gives the attributes of a token. Each value of
+// llama_token_attr is 0 or more, thus YZMA_ERR_HANDLE is sufficient here.
+int yzma_vocab_get_attr(int vocab, int token) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_vocab_get_attr(v, (llama_token) token);
+}
+
+// yzma_vocab_type gives the kind of the tokenizer. Each value of
+// llama_vocab_type is 0 or more, thus YZMA_ERR_HANDLE is sufficient here.
+int yzma_vocab_type(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_vocab_type(v);
+}
+
+// yzma_vocab_get_score gives the score of a token. A result of this shape
+// cannot carry an error, thus a bad handle gives 0.0f.
+float yzma_vocab_get_score(int vocab, int token) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return 0.0f;
+    }
+    return llama_vocab_get_score(v, (llama_token) token);
+}
+
+// yzma_vocab_get_text copies the text of a token into buf. The vocabulary owns
+// the text of llama_vocab_get_text, thus this makes a copy.
+//
+// The text is the raw form in the vocabulary, which holds the marks of the
+// tokenizer. Use yzma_token_to_piece for the text that a program prints.
+int yzma_vocab_get_text(int vocab, int token, char * buf, int cap) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_HANDLE;
+    }
+    return copy_text(llama_vocab_get_text(v, (llama_token) token), buf, cap);
+}
+
+// yzma_vocab_get_suppress_tokens copies the tokens that the model suppresses
+// into out. It gives the number of tokens, or the negative of the number that
+// out needs.
+int yzma_vocab_get_suppress_tokens(int vocab, int * out, int cap) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+
+    int32_t n = 0;
+    const llama_token * tokens = llama_vocab_get_suppress_tokens(v, &n);
+    if (tokens == nullptr || n <= 0) {
+        return 0;
+    }
+    if (cap < n) {
+        return -n;
+    }
+
+    memcpy(out, tokens, (size_t) n * sizeof(llama_token));
+    return n;
+}
+
 //
 // inference
 //
@@ -505,6 +769,10 @@ int yzma_sampler_chain_add(int chain, int smpl) {
         set_error("invalid sampler handle: chain %d, sampler %d", chain, smpl);
         return YZMA_ERR_HANDLE;
     }
+    if (samplers.is_borrowed(smpl)) {
+        set_error("sampler %d is in a chain already", smpl);
+        return YZMA_ERR_HANDLE;
+    }
     llama_sampler_chain_add(c, s);
 
     // The chain now owns the sampler and frees it, so the handle goes away and
@@ -542,6 +810,194 @@ int yzma_sampler_penalties(int n_vocab, int last_n, float repeat, float freq, fl
     return add_sampler(llama_sampler_init_penalties(n_vocab, last_n, repeat, freq, present), "penalties");
 }
 
+int yzma_sampler_typical(float p, int min_keep) {
+    return add_sampler(llama_sampler_init_typical(p, (size_t) min_keep), "typical");
+}
+
+int yzma_sampler_xtc(float p, float t, int min_keep, unsigned int seed) {
+    return add_sampler(llama_sampler_init_xtc(p, t, (size_t) min_keep, (uint32_t) seed), "xtc");
+}
+
+int yzma_sampler_top_n_sigma(float n) {
+    return add_sampler(llama_sampler_init_top_n_sigma(n), "top-n-sigma");
+}
+
+int yzma_sampler_temp_ext(float t, float delta, float exponent) {
+    return add_sampler(llama_sampler_init_temp_ext(t, delta, exponent), "temp-ext");
+}
+
+int yzma_sampler_mirostat(int n_vocab, unsigned int seed, float tau, float eta, int m) {
+    return add_sampler(llama_sampler_init_mirostat(n_vocab, (uint32_t) seed, tau, eta, m), "mirostat");
+}
+
+int yzma_sampler_mirostat_v2(unsigned int seed, float tau, float eta) {
+    return add_sampler(llama_sampler_init_mirostat_v2((uint32_t) seed, tau, eta), "mirostat-v2");
+}
+
+int yzma_sampler_adaptive_p(float target, float decay, unsigned int seed) {
+    return add_sampler(llama_sampler_init_adaptive_p(target, decay, (uint32_t) seed), "adaptive-p");
+}
+
+int yzma_sampler_infill(int vocab) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_HANDLE;
+    }
+    return add_sampler(llama_sampler_init_infill(v), "infill");
+}
+
+// yzma_sampler_grammar makes a sampler that permits only the text that a GBNF
+// grammar describes.
+int yzma_sampler_grammar(int vocab, const char * grammar, const char * root) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_HANDLE;
+    }
+    return add_sampler(llama_sampler_init_grammar(v, grammar, root), "grammar");
+}
+
+// yzma_sampler_grammar_lazy makes a grammar sampler that starts only after a
+// pattern or a token of the trigger appears.
+//
+// patterns holds n_patterns strings with a NUL byte after each one. See
+// split_strings.
+int yzma_sampler_grammar_lazy(int vocab, const char * grammar, const char * root,
+                              const char * patterns, int n_patterns,
+                              const int * trigger_tokens, int n_trigger_tokens) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_HANDLE;
+    }
+
+    std::vector<const char *> pats = split_strings(patterns, n_patterns);
+    if (n_trigger_tokens < 0) {
+        n_trigger_tokens = 0;
+    }
+
+    return add_sampler(llama_sampler_init_grammar_lazy_patterns(
+                           v, grammar, root,
+                           pats.empty() ? nullptr : pats.data(), pats.size(),
+                           n_trigger_tokens == 0 ? nullptr : (const llama_token *) trigger_tokens,
+                           (size_t) n_trigger_tokens),
+                       "lazy grammar");
+}
+
+// yzma_sampler_dry makes a DRY sampler. breakers holds n_breakers strings with
+// a NUL byte after each one. See split_strings.
+int yzma_sampler_dry(int vocab, float multiplier, float base, int allowed_length,
+                     int penalty_last, const char * breakers, int n_breakers) {
+    const llama_vocab * v = vocabs.get(vocab);
+    if (v == nullptr) {
+        set_error("invalid vocab handle %d", vocab);
+        return YZMA_ERR_HANDLE;
+    }
+
+    std::vector<const char *> seq = split_strings(breakers, n_breakers);
+
+    return add_sampler(llama_sampler_init_dry(v, multiplier, base, allowed_length, penalty_last,
+                                              seq.empty() ? nullptr : seq.data(), seq.size()),
+                       "dry");
+}
+
+// yzma_sampler_logit_bias makes a sampler that moves the logit of a token.
+//
+// llama_sampler_init_logit_bias takes an array of llama_logit_bias, which is a
+// struct. Thus the tokens and the biases arrive as two arrays and this builds
+// the array of structs.
+int yzma_sampler_logit_bias(int n_vocab, const int * tokens, const float * biases, int n) {
+    if (n < 0) {
+        n = 0;
+    }
+
+    std::vector<llama_logit_bias> items((size_t) n);
+    for (int i = 0; i < n; i++) {
+        items[i].token = (llama_token) tokens[i];
+        items[i].bias  = biases[i];
+    }
+
+    return add_sampler(llama_sampler_init_logit_bias(n_vocab, n, items.empty() ? nullptr : items.data()),
+                       "logit-bias");
+}
+
+// yzma_sampler_name copies the name of a sampler into buf.
+int yzma_sampler_name(int smpl, char * buf, int cap) {
+    llama_sampler * s = samplers.get(smpl);
+    if (s == nullptr) {
+        set_error("invalid sampler handle %d", smpl);
+        return YZMA_ERR_HANDLE;
+    }
+    return copy_text(llama_sampler_name(s), buf, cap);
+}
+
+// yzma_sampler_get_seed gives the seed of a sampler. The value of
+// LLAMA_DEFAULT_SEED is 0xFFFFFFFF, thus the Go side reads the result as a
+// uint32.
+int yzma_sampler_get_seed(int smpl) {
+    llama_sampler * s = samplers.get(smpl);
+    if (s == nullptr) {
+        set_error("invalid sampler handle %d", smpl);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_sampler_get_seed(s);
+}
+
+// yzma_sampler_clone makes a copy of a sampler. The caller owns the copy.
+int yzma_sampler_clone(int smpl) {
+    llama_sampler * s = samplers.get(smpl);
+    if (s == nullptr) {
+        set_error("invalid sampler handle %d", smpl);
+        return YZMA_ERR_HANDLE;
+    }
+    return add_sampler(llama_sampler_clone(s), "clone");
+}
+
+int yzma_sampler_chain_n(int chain) {
+    llama_sampler * c = samplers.get(chain);
+    if (c == nullptr) {
+        set_error("invalid sampler handle %d", chain);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_sampler_chain_n(c);
+}
+
+// yzma_sampler_chain_get gives a handle to the sampler at position i of a
+// chain. The chain keeps the sampler, thus the handle is borrowed and
+// yzma_sampler_free of it frees nothing.
+int yzma_sampler_chain_get(int chain, int i) {
+    llama_sampler * c = samplers.get(chain);
+    if (c == nullptr) {
+        set_error("invalid sampler handle %d", chain);
+        return YZMA_ERR_HANDLE;
+    }
+
+    llama_sampler * s = llama_sampler_chain_get(c, i);
+    if (s == nullptr) {
+        set_error("chain %d has no sampler at %d", chain, i);
+        return YZMA_ERR_HANDLE;
+    }
+    return samplers.add_borrowed(s);
+}
+
+// yzma_sampler_chain_remove takes the sampler at position i out of a chain. The
+// caller then owns the sampler.
+int yzma_sampler_chain_remove(int chain, int i) {
+    llama_sampler * c = samplers.get(chain);
+    if (c == nullptr) {
+        set_error("invalid sampler handle %d", chain);
+        return YZMA_ERR_HANDLE;
+    }
+
+    llama_sampler * s = llama_sampler_chain_remove(c, i);
+    if (s == nullptr) {
+        set_error("chain %d has no sampler at %d", chain, i);
+        return YZMA_ERR_HANDLE;
+    }
+    return samplers.add(s);
+}
+
 int yzma_sampler_sample(int smpl, int ctx, int idx) {
     llama_sampler * s = samplers.get(smpl);
     llama_context * c = contexts.get(ctx);
@@ -572,9 +1028,13 @@ int yzma_sampler_reset(int smpl) {
     return YZMA_OK;
 }
 
+// yzma_sampler_free frees a sampler. A borrowed handle, which
+// yzma_sampler_chain_get gives, goes away and the sampler stays, because the
+// chain owns it.
 void yzma_sampler_free(int smpl) {
+    const bool owned = !samplers.is_borrowed(smpl);
     llama_sampler * s = samplers.take(smpl);
-    if (s != nullptr) {
+    if (s != nullptr && owned) {
         llama_sampler_free(s);
     }
 }
