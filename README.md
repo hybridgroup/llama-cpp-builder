@@ -84,3 +84,75 @@ See [wasm/README.md](./wasm/README.md) for how the shim works, how to build the 
 ```
 VERSION=$(curl -s https://hybridgroup.github.io/llama-cpp-builder/version.json | jq -r '.tag_name')
 ```
+
+## Asset digests
+
+Each release has a digest manifest that gives the SHA-256 of every asset that yzma can
+install for that tag. A client can check an archive before it extracts it.
+
+```
+curl -s https://hybridgroup.github.io/llama-cpp-builder/digests/b10783.json
+```
+
+A tagged release such as `v0.3.0` has its own manifest, and a new nightly build does not
+replace it.
+
+yzma installs from two repositories, and an asset name can occur in both with different
+bytes. So the manifest groups the assets by the repository that published them:
+
+```json
+{
+  "version": 1,
+  "tag": "v0.3.0",
+  "upstream_tag": "b10621",
+  "generated": "2026-09-03T14:03:39Z",
+  "sources": {
+    "hybridgroup/llama-cpp-builder": {
+      "tag": "v0.3.0",
+      "assets": {
+        "llama-v0.3.0-bin-ubuntu-cuda-13-x64.tar.gz": {"sha256": "af61d03c..."}
+      }
+    },
+    "ggml-org/llama.cpp": {
+      "tag": "b10621",
+      "assets": {
+        "cudart-llama-bin-win-cuda-13.3-x64.zip": {"sha256": "1462a050..."}
+      }
+    }
+  }
+}
+```
+
+`tag` in a source block gives the release that holds those assets, so the download URL is
+`https://github.com/<source>/releases/download/<source tag>/<asset name>`. For a tagged
+release, the upstream assets are under the nightly build tag in `upstream_tag`, which
+comes from the `nightly-tag.txt` asset.
+
+### File digests
+
+An asset that this repo builds also gives the digest of each file in it:
+
+```json
+"llama-b10783-bin-ubuntu-cpu-arm64.tar.gz": {
+  "sha256": "5fcc5cbd...",
+  "files": {"libllama.so.0.3.0": "9c2f...", "libggml.so.0.22.0": "1ab4..."},
+  "links": {"libllama.so": "libllama.so.0", "libllama.so.0": "libllama.so.0.3.0"}
+}
+```
+
+The names are the names that a client writes when it extracts the archive. A client
+removes the archive after it extracts it, so these let it check an installation later.
+`links` gives the name that each symbolic link points to, because a link has no bytes of
+its own.
+
+Each build job hashes its own output before it packs it, so the file digests cost no
+download. Only this repo builds its assets, so an asset from `ggml-org/llama.cpp` has
+`sha256` but no `files`. A client must accept an asset that has no `files`.
+
+The manifests are in [digests/](./digests) in this repo, and the release workflow copies
+them to the site. A manifest is written one time and is not rewritten. The manifests that
+seeded the directory hold only `sha256`, because their releases are older than the build
+step that makes the file digests.
+
+The digests come from the GitHub release API, so they show that an archive is the archive
+that was published. They are not a signature, and they do not show who built it.

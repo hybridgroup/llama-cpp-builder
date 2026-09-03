@@ -1,0 +1,135 @@
+{
+  "generated": "2026-09-03T14:03:45Z",
+  "sources": {
+    "ggml-org/llama.cpp": {
+      "assets": {
+        "cudart-llama-bin-win-cuda-12.4-x64.zip": {
+          "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6"
+        },
+        "cudart-llama-bin-win-cuda-13.3-x64.zip": {
+          "sha256": "1462a050eb4c684921ba51dcc4cc488a036674c3e73e9945ee705b854808d03e"
+        },
+        "cudart-llama-bin-win-cuda-13.4-arm64.zip": {
+          "sha256": "5a40dc7c5fa3d0a80ceeba4f16f9e8d25d87bcf1399c9233588953c43436c33c"
+        },
+        "llama-b10777-bin-android-arm64.tar.gz": {
+          "sha256": "3fa567cba1716f873362d886cbb370afe5bf598575a1901607056893bfb81822"
+        },
+        "llama-b10777-bin-macos-arm64.tar.gz": {
+          "sha256": "ed6258ab3c90ffd180117501670831313e44d13d9d43439ad51efcf8fca6b28e"
+        },
+        "llama-b10777-bin-macos-x64.tar.gz": {
+          "sha256": "8cbd206b1abf8933bd00569d6803bb38d362579b5c35775269b7b0dfc6fee1f4"
+        },
+        "llama-b10777-bin-ubuntu-arm64.tar.gz": {
+          "sha256": "ab097c49f1a2aa18aed3187c3981eda079593e6112bedff4c481257e76f4d4fa"
+        },
+        "llama-b10777-bin-ubuntu-openvino-2026.3.1-x64.tar.gz": {
+          "sha256": "cc681b0365bca8a561894c8122774c0f1cb45475287765cec3b83f35639538a8"
+        },
+        "llama-b10777-bin-ubuntu-rocm-10.0-x64.tar.gz": {
+          "sha256": "7ed7bccd218de2d131fa1361eade828274cc0f1186b49986867ea9e8f7daf474"
+        },
+        "llama-b10777-bin-ubuntu-s390x.tar.gz": {
+          "sha256": "fa8692f4248c1b1650c71bdaaa2ea4a3684c865a3e489ab75db6f588f8f145b9"
+        },
+        "llama-b10777-bin-ubuntu-sycl-fp16-x64.tar.gz": {
+          "sha256": "330ca5b8ccf0f538e96ae5d16c1d6902901dd8dd2d17306a35aeb2e968865cb7"
+        },
+        "llama-b10777-bin-ubuntu-sycl-fp32-x64.tar.gz": {
+          "sha256": "8ab823c228f05c595fefe0901ccfccae9b07b805524f46079eca5ce5eac4a5a0"
+        },
+        "llama-b10777-bin-ubuntu-vulkan-arm64.tar.gz": {
+          "sha256": "0d4a72d534a6f481651350df2cf39139133bd83cc2757fd9a0e677d9bd3d367a"
+        },
+        "llama-b10777-bin-ubuntu-vulkan-x64.tar.gz": {
+          "sha256": "0abfabbbba3c82511ea8c982534e5cc477939fd029b7f8336f36f39fff563ea5"
+        },
+        "llama-b10777-bin-ubuntu-x64.tar.gz": {
+          "sha256": "9ea0ce9bcae2c9e8245c1c5f57ec52e872f789ddce7ec09225f4162e63a5856d"
+        },
+        "llama-b10777-bin-win-cpu-arm64.zip": {
+          "sha256": "eb8e9ceabafdeff40f6dae45db02367d1d5019274f541d6f19212a72ac43c804"
+        },
+        "llama-b10777-bin-win-cpu-x64.zip": {
+          "sha256": "1e8e1b99a815617efc6c5134f1b1bfb4194a193de307fb510d8a5cffff561c9a"
+        },
+        "llama-b10777-bin-win-cuda-12.4-x64.zip": {
+          "sha256": "436fb6461c8c85276c19e739ecb723e40e929951e9565c3c2c26d47f14acc0ff"
+        },
+        "llama-b10777-bin-win-cuda-13.3-x64.zip": {
+          "sha256": "10e028e2c19f929efd26403ed9c96211528edc649121a45d6c0361f2bf7ac995"
+        },
+        "llama-b10777-bin-win-cuda-13.4-arm64.zip": {
+          "sha256": "9554811fa2500e01da91e89c59af91c6b6d6366db8bea441af2e27b4aae88378"
+        },
+        "llama-b10777-bin-win-opencl-adreno-arm64.zip": {
+          "sha256": "26dcdedd4292380ee0aa0b6bb2c7829903e4eb511ee40f98249ecb5342fc5965"
+        },
+        "llama-b10777-bin-win-openvino-2026.3.1-x64.zip": {
+          "sha256": "8b5e118cfc7271c233db001a8109d5f96562cf10bf2607f6366d10f7db8f9ff2"
+        },
+        "llama-b10777-bin-win-rocm-10.0-x64.zip": {
+          "sha256": "77c7557180c139ebc9911ac1f66d230f1d9cba5fd47c2867f74647ecf9c57c82"
+        },
+        "llama-b10777-bin-win-sycl-x64.zip": {
+          "sha256": "bda601397e770aaffcbd37198ebf5971862cb4bcf244ffaf418c0f7a7944a4b2"
+        },
+        "llama-b10777-bin-win-vulkan-x64.zip": {
+          "sha256": "8e5af46b2785dccf28e9a518670fa83af35feaaf88231006649be7c2232f555e"
+        },
+        "llama-b10777-ui.tar.gz": {
+          "sha256": "ec0d44280f21d70f15c1fbc72494fb8eed97c77692524ec1ffd9817bfe499350"
+        },
+        "llama-b10777-xcframework.zip": {
+          "sha256": "489e51cd7fee66e8feccea86481dd47327c0e451c263801ca88b7bd01eb78f76"
+        }
+      },
+      "tag": "b10777"
+    },
+    "hybridgroup/llama-cpp-builder": {
+      "assets": {
+        "llama-b10777-bin-ubuntu-cpu-arm64.tar.gz": {
+          "sha256": "e927d00b9900dbb148acfd39d25f7bc41f7caf04b13a378eacc57bfef6a4f386"
+        },
+        "llama-b10777-bin-ubuntu-cuda-13-arm64.tar.gz": {
+          "sha256": "ea0d1eaa52ff5ad8d5c091d7c28bdf1fa3481157cb0757ed1e39c934ab3e76ea"
+        },
+        "llama-b10777-bin-ubuntu-cuda-13-x64.tar.gz": {
+          "sha256": "aebf77d53b964468e789fa922c02487d3e9d95b67c68d6ddee344a9d13ed4d44"
+        },
+        "llama-b10777-bin-ubuntu-cuda-arm64.tar.gz": {
+          "sha256": "ce290e58f4f04ed8cd28d7113503027fa27ab2e4768a73d23ed693ec98871ca8"
+        },
+        "llama-b10777-bin-ubuntu-cuda-x64.tar.gz": {
+          "sha256": "ca8ef9213eca04066ebc502fe53b634fe684ce0af7e29c73b23a800dd510fec5"
+        },
+        "llama-b10777-bin-ubuntu-trixie-cpu-arm64.tar.gz": {
+          "sha256": "d34038003d1c564477e3c660d2e4bfb8680f230bc74d7e43e84829f49dcbe395"
+        },
+        "llama-b10777-bin-ubuntu-trixie-opencl-arm64.tar.gz": {
+          "sha256": "a0e42af087ec532568af444f8cfcfe582e1d322e665936f94fa203aa792736dd"
+        },
+        "llama-b10777-bin-ubuntu-trixie-vulkan-arm64.tar.gz": {
+          "sha256": "7ef407e239d36a248ee0581b4c59cce08fa08aca669821ba0b165e19d414340a"
+        },
+        "llama-b10777-bin-ubuntu-vulkan-arm64.tar.gz": {
+          "sha256": "eaa5a60ea6b22e0c3083fdb705a53634ccf10b7888ac16fc78147ea8b40caa3a"
+        },
+        "llama-b10777-bin-wasm-simd-mt.tar.gz": {
+          "sha256": "e340af48535788c9e7f63d884dbd98ab360fb4867258c441ddb97fbb1704efa1"
+        },
+        "llama-b10777-bin-wasm-simd.tar.gz": {
+          "sha256": "4b4e0e97bf33cfda6cd40d490b68d417b61b2c8c4c12622d2db04c355c0c9b3a"
+        },
+        "llama-b10777-bin-wasm-webgpu.tar.gz": {
+          "sha256": "d920a22069f9c6f1eee8f4239dd8b7d753e30cf11d58f117d8727ac22309ab69"
+        }
+      },
+      "tag": "b10777"
+    }
+  },
+  "tag": "b10777",
+  "upstream_tag": "b10777",
+  "version": 1
+}
