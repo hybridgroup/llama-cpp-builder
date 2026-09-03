@@ -19,6 +19,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Each deployment replaces the whole site, so the manifests must come from the
+      # repo. A manifest that is only on the site would go away at the next release.
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          ref: main
       - name: Create version JSON
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -32,6 +38,12 @@ jobs:
                | sort_by(.published_at) | last | .tag_name')
           if [ "$PREV_TAG" = "null" ]; then PREV_TAG=""; fi
           printf '{"tag_name":"%s"}\n' "$PREV_TAG" > _site/previous.json
+      - name: Copy the digest manifests
+        run: |
+          if [ -d digests ]; then
+            cp -R digests _site/digests
+            echo "published $(ls _site/digests | wc -l) manifests"
+          fi
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:

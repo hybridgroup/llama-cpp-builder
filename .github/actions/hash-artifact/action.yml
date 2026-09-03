@@ -1,0 +1,22 @@
+name: "Hash Artifact Contents"
+description: "Writes the SHA-256 of each file that goes into an archive and uploads it"
+inputs:
+  archive:
+    description: "Name of the archive that the files are packed into"
+    required: true
+  source-dir:
+    description: "Directory that the archive is packed from"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Hash the files
+      shell: bash
+      run: .github/scripts/hash-files.sh "${{ inputs.archive }}" "${{ inputs.source-dir }}"
+    - name: Upload the file digests
+      uses: actions/upload-artifact@v7
+      with:
+        path: ${{ inputs.archive }}.files.json
+        name: ${{ inputs.archive }}.files.json
+        archive: false

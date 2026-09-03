@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'digests/**'
   workflow_dispatch:
   schedule:
     - cron: '15 * * * *'
@@ -129,6 +131,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-x64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -188,6 +195,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-x64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -268,6 +280,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-arm64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -349,6 +366,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -446,6 +468,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-vulkan-arm64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -543,6 +570,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-vulkan-arm64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -620,6 +652,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cpu-arm64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -697,6 +734,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-cpu-arm64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -776,6 +818,11 @@ jobs:
       - name: Pack artifacts
         run: |
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-opencl-arm64.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./llama.cpp/build/bin .
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-trixie-opencl-arm64.tar.gz
+          source-dir: ./llama.cpp/build/bin
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -854,6 +901,21 @@ jobs:
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./out/wasm-simd .
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./out/wasm-simd-mt .
           tar -czvf llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-webgpu.tar.gz --transform "s,./,llama-${{ needs.check-version.outputs.llama-tag }}/," -C ./out/wasm-webgpu .
+      - name: Hash the wasm-simd artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd.tar.gz
+          source-dir: ./out/wasm-simd
+      - name: Hash the wasm-simd-mt artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-simd-mt.tar.gz
+          source-dir: ./out/wasm-simd-mt
+      - name: Hash the wasm-webgpu artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-wasm-webgpu.tar.gz
+          source-dir: ./out/wasm-webgpu
       - name: Upload release binaries
         uses: actions/upload-artifact@v7
         with:
@@ -985,10 +1047,61 @@ jobs:
             See the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/${{ needs.check-version.outputs.llama-tag }}) for details.
           artifacts: "*.tar.gz"
 
+  digests:
+    needs:
+      - check-version
+      - release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          ref: main
+      # The build jobs already hashed the files that they packed, so the file
+      # digests cost no download of a release asset.
+      - name: Download the file digests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          .github/scripts/fetch-file-digests.sh "${{ github.run_id }}" files-digests
+      - name: Build the digest manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FILES_DIR: files-digests
+        run: |
+          .github/scripts/build-digests.sh "${{ needs.check-version.outputs.llama-tag }}"
+      - name: Commit the digest manifest
+        env:
+          TAG: ${{ needs.check-version.outputs.llama-tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # A new manifest is untracked, so stage it before the check. The script
+          # keeps a manifest that is already there, so a repeat run stages nothing.
+          git add "digests/${TAG}.json"
+          if git diff --cached --quiet -- digests; then
+            echo "digests/${TAG}.json is already published"
+            exit 0
+          fi
+          git commit -m "digests: add the asset digests for ${TAG}"
+          # A build that ran at the same time can move main between the checkout and
+          # the push, so rebase and try again.
+          for i in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            git pull --rebase origin main
+          done
+          exit 1
+
   publish-version:
     needs:
       - check-version
       - release
+      - digests
     uses: ./.github/workflows/publish-version.yml
     with:
       tag_name: ${{ needs.check-version.outputs.llama-tag }}
