@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 5
+#define YZMA_ABI_VERSION 6
 
 // Error codes. These are also in the Go code.
 enum {
@@ -356,8 +356,8 @@ int yzma_chat_apply_template(int model, const char * role, const char * content,
 // context
 //
 
-int yzma_context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
-                     int embeddings, int pooling_type) {
+static int context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
+                       int embeddings, int pooling_type, int n_seq_max) {
     llama_model * m = models.get(model);
     if (m == nullptr) {
         set_error("invalid model handle %d", model);
@@ -365,6 +365,9 @@ int yzma_context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_thre
     }
 
     llama_context_params params = llama_context_default_params();
+    if (n_seq_max > 0) {
+        params.n_seq_max = (uint32_t) n_seq_max;
+    }
     if (n_ctx > 0) {
         params.n_ctx = (uint32_t) n_ctx;
     }
@@ -389,6 +392,19 @@ int yzma_context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_thre
     return contexts.add(ctx);
 }
 
+// yzma_context_new makes a context that holds one sequence.
+int yzma_context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
+                     int embeddings, int pooling_type) {
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, 1);
+}
+
+// yzma_context_new_seq makes a context that holds n_seq_max sequences. A batch
+// that carries more than one sequence needs it.
+int yzma_context_new_seq(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
+                         int embeddings, int pooling_type, int n_seq_max) {
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max);
+}
+
 void yzma_context_free(int ctx) {
     llama_context * c = contexts.take(ctx);
     if (c != nullptr) {
@@ -405,14 +421,145 @@ int yzma_context_n_ctx(int ctx) {
     return (int) llama_n_ctx(c);
 }
 
-int yzma_memory_clear(int ctx, int clear_data) {
+int yzma_context_n_batch(int ctx) {
     llama_context * c = contexts.get(ctx);
     if (c == nullptr) {
         set_error("invalid context handle %d", ctx);
         return YZMA_ERR_HANDLE;
     }
-    llama_memory_clear(llama_get_memory(c), clear_data != 0);
+    return (int) llama_n_batch(c);
+}
+
+int yzma_context_n_ubatch(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_n_ubatch(c);
+}
+
+int yzma_context_n_seq_max(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_n_seq_max(c);
+}
+
+int yzma_context_n_ctx_seq(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_n_ctx_seq(c);
+}
+
+// memory_of gives the memory of a context, or nullptr with the error set.
+static llama_memory_t memory_of(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return nullptr;
+    }
+    return llama_get_memory(c);
+}
+
+int yzma_memory_clear(int ctx, int clear_data) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    llama_memory_clear(mem, clear_data != 0);
     return YZMA_OK;
+}
+
+// yzma_memory_seq_rm removes the tokens of a sequence between p0 and p1. A
+// negative p0 is the start of the sequence and a negative p1 is the end of it.
+// The result is 1 if the memory removed the tokens and 0 if it cannot, which
+// happens when the memory keeps only whole sequences.
+int yzma_memory_seq_rm(int ctx, int seq_id, int p0, int p1) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_memory_seq_rm(mem, (llama_seq_id) seq_id, (llama_pos) p0, (llama_pos) p1) ? 1 : 0;
+}
+
+// yzma_memory_seq_cp copies the tokens of one sequence between p0 and p1 into
+// another sequence.
+int yzma_memory_seq_cp(int ctx, int seq_id_src, int seq_id_dst, int p0, int p1) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    llama_memory_seq_cp(mem, (llama_seq_id) seq_id_src, (llama_seq_id) seq_id_dst,
+                        (llama_pos) p0, (llama_pos) p1);
+    return YZMA_OK;
+}
+
+// yzma_memory_seq_keep removes every sequence except one.
+int yzma_memory_seq_keep(int ctx, int seq_id) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    llama_memory_seq_keep(mem, (llama_seq_id) seq_id);
+    return YZMA_OK;
+}
+
+// yzma_memory_seq_add moves the tokens of a sequence between p0 and p1 by
+// delta positions. This is how a program shifts a context that is full.
+int yzma_memory_seq_add(int ctx, int seq_id, int p0, int p1, int delta) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    llama_memory_seq_add(mem, (llama_seq_id) seq_id, (llama_pos) p0, (llama_pos) p1, (llama_pos) delta);
+    return YZMA_OK;
+}
+
+// yzma_memory_seq_div divides the positions of the tokens of a sequence
+// between p0 and p1 by d.
+int yzma_memory_seq_div(int ctx, int seq_id, int p0, int p1, int d) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    llama_memory_seq_div(mem, (llama_seq_id) seq_id, (llama_pos) p0, (llama_pos) p1, d);
+    return YZMA_OK;
+}
+
+// yzma_memory_seq_pos_min gives the smallest position of a sequence, and -1 if
+// the sequence is empty. A position is a normal negative value here, thus a bad
+// handle gives YZMA_ERR_BAD_HANDLE.
+int yzma_memory_seq_pos_min(int ctx, int seq_id) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return (int) llama_memory_seq_pos_min(mem, (llama_seq_id) seq_id);
+}
+
+// yzma_memory_seq_pos_max gives the largest position of a sequence, and -1 if
+// the sequence is empty.
+int yzma_memory_seq_pos_max(int ctx, int seq_id) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return (int) llama_memory_seq_pos_max(mem, (llama_seq_id) seq_id);
+}
+
+// yzma_memory_can_shift tells if the memory accepts yzma_memory_seq_add.
+int yzma_memory_can_shift(int ctx) {
+    llama_memory_t mem = memory_of(ctx);
+    if (mem == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_memory_can_shift(mem) ? 1 : 0;
 }
 
 //
@@ -723,6 +870,65 @@ int yzma_encode(int ctx, const int * tokens, int n_tokens) {
         set_error("llama_encode returned %d", rc);
     }
     return rc;
+}
+
+// run_batch makes a llama_batch out of the parallel arrays that the Go side
+// wrote into the memory of the module, and then decodes or encodes it.
+//
+// llama_batch keeps seq_id as an array of pointers, one for each token, and a
+// pointer to an array of pointers cannot cross the boundary. The Go side thus
+// sends one flat array of n_tokens * n_seq_max identifiers, and this makes the
+// pointers into it. The arrays stay the property of the Go side: llama.cpp
+// reads them during the call and keeps none of them.
+static int run_batch(int ctx, const int * tokens, const int * pos, const int * n_seq_id,
+                     const int * seq_ids, int n_seq_max, const signed char * logits,
+                     int n_tokens, bool encode) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    if (n_tokens <= 0 || n_seq_max <= 0) {
+        set_error("a batch needs a minimum of one token and one sequence, got %d and %d",
+                  n_tokens, n_seq_max);
+        return YZMA_ERR_GENERIC;
+    }
+
+    // llama_batch_init makes room for one pointer more than the number of
+    // tokens and leaves the last one empty. Do the same here.
+    std::vector<llama_seq_id *> seq_ptrs((size_t) n_tokens + 1, nullptr);
+    for (int i = 0; i < n_tokens; i++) {
+        seq_ptrs[(size_t) i] = (llama_seq_id *) seq_ids + (size_t) i * (size_t) n_seq_max;
+    }
+
+    llama_batch batch = {};
+    batch.n_tokens = n_tokens;
+    batch.token    = (llama_token *) tokens;
+    batch.pos      = (llama_pos *) pos;
+    batch.n_seq_id = (int32_t *) n_seq_id;
+    batch.seq_id   = seq_ptrs.data();
+    batch.logits   = (int8_t *) logits;
+
+    const int rc = encode ? llama_encode(c, batch) : llama_decode(c, batch);
+    if (rc != 0) {
+        set_error("llama_%s returned %d", encode ? "encode" : "decode", rc);
+    }
+    return rc;
+}
+
+// yzma_decode_batch runs a batch that carries the position, the sequences, and
+// the logit flag of each token. yzma_decode is the same call for a batch of one
+// sequence whose positions continue from the state of the context.
+int yzma_decode_batch(int ctx, const int * tokens, const int * pos, const int * n_seq_id,
+                      const int * seq_ids, int n_seq_max, const signed char * logits,
+                      int n_tokens) {
+    return run_batch(ctx, tokens, pos, n_seq_id, seq_ids, n_seq_max, logits, n_tokens, false);
+}
+
+int yzma_encode_batch(int ctx, const int * tokens, const int * pos, const int * n_seq_id,
+                      const int * seq_ids, int n_seq_max, const signed char * logits,
+                      int n_tokens) {
+    return run_batch(ctx, tokens, pos, n_seq_id, seq_ids, n_seq_max, logits, n_tokens, true);
 }
 
 // yzma_get_embeddings_seq copies n float values of the embedding of a sequence
