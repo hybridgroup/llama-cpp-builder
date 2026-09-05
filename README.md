@@ -94,9 +94,15 @@ VERSION=$(curl -s https://hybridgroup.github.io/llama-cpp-builder/version.json |
 Each release has a digest manifest that gives the SHA-256 of every asset that yzma can
 install for that tag. A client can check an archive before it extracts it.
 
+The manifest is an asset of the release it describes, and there is a copy on the site:
+
 ```
+curl -sL https://github.com/hybridgroup/llama-cpp-builder/releases/download/b10783/b10783.json
 curl -s https://hybridgroup.github.io/llama-cpp-builder/digests/b10783.json
 ```
+
+Both hold the same bytes. The release asset is the one to prefer, because GitHub records
+its digest. See [The manifest digest](#the-manifest-digest).
 
 A tagged release such as `v0.3.0` has its own manifest, and a new nightly build does not
 replace it.
@@ -178,12 +184,48 @@ jq -r --arg a "$ASSET" \
 (cd /path/to/lib && sha256sum -c /path/to/sums.txt)
 ```
 
+### The manifest digest
+
+Every digest above lives in the manifest, so a client that takes the manifest on trust
+takes all of them on trust. The manifest digest is the value that breaks that circle: a
+client keeps it outside the release and checks the manifest bytes against it, then the
+manifest checks everything else.
+
+The manifest is published as an asset of its own release, named `<tag>.json`, and GitHub
+records the SHA-256 of every asset it stores. So the manifest digest is published, with
+the release and by the same means as the archives:
+
+```
+gh api repos/hybridgroup/llama-cpp-builder/releases/tags/b10816 \
+  --jq '.assets[] | select(.name == "b10816.json") | .digest'
+```
+
+The release notes for the tag print the complete pin, and the version files carry it for
+the two most recent builds, which costs no API request:
+
+```console
+$ curl -s https://hybridgroup.github.io/llama-cpp-builder/version.json
+{"tag_name":"b10816","manifest_sha256":"<digest>","pin":"b10816@sha256:<digest>"}
+```
+
+yzma takes that pin as its version:
+
+```
+yzma install --version b10816@sha256:<digest> --lib /path/to/lib
+```
+
+The digest of a platform archive is not the manifest digest. Those digests are what the
+manifest holds, one for each asset. The manifest never names itself, so `<tag>.json` is
+left out of the asset list that it publishes.
+
 ### Where the manifests live
 
-The manifests are in [digests/](./digests) in this repo, and the release workflow copies
-them to the site. A manifest is written one time and is not rewritten. The manifests that
-seeded the directory hold only `sha256`, because their releases are older than the build
-step that makes the file digests.
+The manifests are in [digests/](./digests) in this repo. The release workflow copies them
+to the site and uploads each one to its own release. A manifest is written one time and is
+not rewritten, so a pin stays good. The manifests that seeded the directory hold only
+`sha256`, because their releases are older than the build step that makes the file
+digests.
 
 The digests come from the GitHub release API, so they show that an archive is the archive
-that was published. They are not a signature, and they do not show who built it.
+that was published. They are not a signature, and they do not show who built it. A pin
+shows that the manifest is the one the client expected, which is a different thing.

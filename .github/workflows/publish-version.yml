@@ -30,14 +30,30 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           mkdir -p _site
-          printf '{"tag_name":"%s"}\n' "${{ inputs.tag_name }}" > _site/version.json
+          # A version file carries the digest of the manifest for its tag, so a client
+          # can pin the release without a GitHub API request. A tag with no manifest
+          # gets the tag alone, as before.
+          write_version() {
+            local tag="$1" out="$2"
+            local manifest="digests/${tag}.json"
+            if [ -n "$tag" ] && [ -f "$manifest" ]; then
+              local digest
+              digest=$(sha256sum "$manifest" | cut -d' ' -f1)
+              printf '{"tag_name":"%s","manifest_sha256":"%s","pin":"%s@sha256:%s"}\n' \
+                "$tag" "$digest" "$tag" "$digest" > "$out"
+            else
+              printf '{"tag_name":"%s"}\n' "$tag" > "$out"
+            fi
+            cat "$out"
+          }
+          write_version "${{ inputs.tag_name }}" _site/version.json
           PREV_TAG=$(curl -sL -H "Authorization: Bearer $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" \
             | jq -r --arg current "${{ inputs.tag_name }}" \
               '[.[] | select(.draft == false) | select(.tag_name != $current)]
                | sort_by(.published_at) | last | .tag_name')
           if [ "$PREV_TAG" = "null" ]; then PREV_TAG=""; fi
-          printf '{"tag_name":"%s"}\n' "$PREV_TAG" > _site/previous.json
+          write_version "$PREV_TAG" _site/previous.json
       - name: Copy the digest manifests
         run: |
           if [ -d digests ]; then
