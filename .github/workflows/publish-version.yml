@@ -6,6 +6,16 @@ on:
       tag_name:
         required: true
         type: string
+  # The build workflow calls this after a release. A deployment can still be lost,
+  # such as when the release came from a run that the github-pages environment did
+  # not permit to deploy. Run this by hand from main to put the site back in step
+  # with a release that is already published.
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: The release tag that the version page names
+        required: true
+        type: string
 
 permissions:
   contents: read
