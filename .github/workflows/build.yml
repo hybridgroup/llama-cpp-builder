@@ -1140,6 +1140,16 @@ jobs:
             git pull --rebase origin main
           done
           exit 1
+      # The manifest goes on the release it describes. GitHub records the SHA-256 of
+      # every asset it stores, so this is what publishes the manifest digest that a
+      # client pins. It cannot happen before the manifest is built, because the
+      # manifest holds the digests of the other assets.
+      - name: Publish the manifest as a release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.check-version.outputs.llama-tag }}
+        run: |
+          .github/scripts/publish-manifest.sh "${TAG}"
 
   publish-version:
     needs:

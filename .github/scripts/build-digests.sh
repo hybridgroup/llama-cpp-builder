@@ -44,11 +44,16 @@ if [[ ! "$UPSTREAM_TAG" =~ ^b[0-9]+$ ]]; then
   exit 1
 fi
 
+# The manifest is published as an asset of the release that it describes, so it must
+# not list itself. A manifest that named its own digest could never be rebuilt.
+export MANIFEST_ASSET="${TAG}.json"
+
 # assets_for prints {"<name>": {"sha256": "<hex>"}} for one release. GitHub gives the
 # digest as "sha256:<hex>". An asset that is still uploading has no digest yet.
 assets_for() {
   gh api "repos/$1/releases/tags/$2" --jq '
     [.assets[]
+     | select(.name != env.MANIFEST_ASSET)
      | select(.digest != null)
      | {key: .name, value: {sha256: (.digest | sub("^sha256:"; ""))}}]
     | from_entries'
@@ -56,7 +61,8 @@ assets_for() {
 
 # missing_digests prints the names of the assets that have no digest.
 missing_digests() {
-  gh api "repos/$1/releases/tags/$2" --jq '.assets[] | select(.digest == null) | .name'
+  gh api "repos/$1/releases/tags/$2" --jq \
+    '.assets[] | select(.name != env.MANIFEST_ASSET) | select(.digest == null) | .name'
 }
 
 BUILDER_MISSING=$(missing_digests "$BUILDER_REPO" "$TAG")
