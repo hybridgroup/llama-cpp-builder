@@ -980,6 +980,10 @@ jobs:
           archive: false
 
   release:
+    # A run for a pull request builds and stops. Every job below needs this one, so
+    # such a run publishes no release, no manifest and no version page, and it does
+    # not ask yzma to test one.
+    if: ${{ github.event_name != 'pull_request' }}
     needs: 
       - check-version
       - build-cuda-amd64
@@ -1156,9 +1160,9 @@ jobs:
       - check-version
       - release
       - digests
-    # The github-pages environment permits a deployment from main only, so a run
-    # for a pull request stops here. Without this it fails at that gate, after the
-    # release and the manifest are already published.
+    # A run for a pull request stops at the release job, so this never runs for
+    # one. It says so again, because the github-pages environment permits a
+    # deployment from main only and a failure here comes after a release.
     if: ${{ github.event_name != 'pull_request' }}
     uses: ./.github/workflows/publish-version.yml
     with:
