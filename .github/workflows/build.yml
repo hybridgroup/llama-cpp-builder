@@ -7,6 +7,11 @@ on:
     paths-ignore:
       - 'digests/**'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'llama.cpp tag to build, such as v0.4.0. Empty takes the newest release.'
+        required: false
+        type: string
   schedule:
     - cron: '15 * * * *'
     - cron: '45 * * * *'
@@ -42,18 +47,29 @@ jobs:
                 | select(.id < ($id | tonumber))] | length')
           echo "Builds in progress: $COUNT"
           echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
-      - name: Fetch latest llama.cpp release
+      - name: Fetch the llama.cpp releases to consider
         id: llamatag
         run: |
-          LLAMA_TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=100" \
-            | jq -r '[.[] | select(.draft == false)] | sort_by(.published_at) | last | .tag_name')
-          if [ -z "$LLAMA_TAG" ] || [ "$LLAMA_TAG" = "null" ]; then
+          # A tagged release such as v0.4.0 and a nightly build such as b10816 are
+          # two streams. Taking only the newest by date loses a tagged release that
+          # a nightly follows a minute later, so track the newest of each.
+          RELEASES=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=100")
+          NIGHTLY=$(echo "$RELEASES" | jq -r '[.[] | select(.draft == false)
+            | select(.tag_name | test("^b[0-9]+$"))]
+            | sort_by(.published_at) | last | .tag_name')
+          TAGGED=$(echo "$RELEASES" | jq -r '[.[] | select(.draft == false)
+            | select(.tag_name | test("^v[0-9]"))]
+            | sort_by(.published_at) | last | .tag_name')
+          if [ "$NIGHTLY" = "null" ]; then NIGHTLY=""; fi
+          if [ "$TAGGED" = "null" ]; then TAGGED=""; fi
+          if [ -z "$NIGHTLY" ] && [ -z "$TAGGED" ]; then
             echo "No llama.cpp release found"
             exit 1
           fi
-          echo "Found llama.cpp tag: $LLAMA_TAG"
-          echo "name=${LLAMA_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Found llama.cpp nightly ${NIGHTLY:-none} and tagged release ${TAGGED:-none}"
+          echo "nightly=${NIGHTLY}" >> "$GITHUB_OUTPUT"
+          echo "tagged=${TAGGED}" >> "$GITHUB_OUTPUT"
       - name: Fetch latest own release
         id: currenttag
         run: |
@@ -61,21 +77,49 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases?per_page=100" \
             | jq -r '[.[] | select(.draft == false)] | sort_by(.published_at) | last | .tag_name')
           if [ "$CURRENT_TAG" = "null" ]; then CURRENT_TAG=""; fi
-          echo "Found own tag: $CURRENT_TAG"
+          echo "Found own tag: ${CURRENT_TAG:-none}"
           echo "name=${CURRENT_TAG}" >> "$GITHUB_OUTPUT"
       - name: Save tags
         id: tags
+        env:
+          MANUAL_TAG: ${{ inputs.tag }}
         run: |
-          LLAMA_TAG="${{ steps.llamatag.outputs.name }}"
+          NIGHTLY="${{ steps.llamatag.outputs.nightly }}"
+          TAGGED="${{ steps.llamatag.outputs.tagged }}"
           CURRENT_TAG="${{ steps.currenttag.outputs.name }}"
+          # Ask for the one tag, because a tagged release is built after later
+          # nightlies are and so falls off any page of the release list.
+          have_release() {
+            [ "$(curl -s -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/tags/$1")" = "200" ]
+          }
+          if [ -n "$MANUAL_TAG" ]; then
+            # A hand picked tag rebuilds a release that was missed, so it takes
+            # precedence and is built even if it is here already.
+            case "$MANUAL_TAG" in
+              b[0-9]*|v[0-9]*) ;;
+              *) echo "Tag $MANUAL_TAG is neither a nightly build nor a release"; exit 1 ;;
+            esac
+            LLAMA_TAG="$MANUAL_TAG"
+          elif [ -n "$TAGGED" ] && ! have_release "$TAGGED"; then
+            # A tagged release comes first, and only until it is built.
+            LLAMA_TAG="$TAGGED"
+          else
+            LLAMA_TAG="$NIGHTLY"
+          fi
           SHOULD_BUILD=true
           if [ "${{ steps.inflight.outputs.count }}" -gt 0 ]; then
             echo "A build is already in progress, skip this run"
             SHOULD_BUILD=false
-          elif [ "$LLAMA_TAG" = "$CURRENT_TAG" ]; then
-            echo "Release $LLAMA_TAG is current, skip this run"
+          elif [ -z "$LLAMA_TAG" ]; then
+            echo "No llama.cpp release to build, skip this run"
+            SHOULD_BUILD=false
+          elif [ -z "$MANUAL_TAG" ] && have_release "$LLAMA_TAG"; then
+            echo "Release $LLAMA_TAG is built already, skip this run"
             SHOULD_BUILD=false
           fi
+          echo "Building ${LLAMA_TAG:-none}, should-build=${SHOULD_BUILD}"
           echo "llama-tag=${LLAMA_TAG}" >> "$GITHUB_OUTPUT"
           echo "current-tag=${CURRENT_TAG}" >> "$GITHUB_OUTPUT"
           echo "should-build=${SHOULD_BUILD}" >> "$GITHUB_OUTPUT"
