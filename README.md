@@ -4,7 +4,11 @@
 
 This repo builds binary versions of `llama.cpp` libraries and executables for architectures that are not already part of the normal builds: Linux with CUDA or Vulkan, Linux arm64 with CPU, Vulkan, or OpenCL, and WebAssembly for a browser.
 
-New releases are automatically built for the latest release version of `llama.cpp`. The latest release is checked once per hour.
+New releases are built automatically, and `llama.cpp` is checked twice per hour. A tagged
+release such as `v0.4.0` is built first, and only until it is here, so a nightly build
+published minutes later cannot take its place. Everything else builds the newest nightly.
+The Build workflow also takes a `tag` to run by hand, which builds that tag whatever the
+release pages say.
 
 [![yzma logo](https://raw.githubusercontent.com/hybridgroup/yzma/refs/heads/main/images/yzma-logo-full-color-small.png)](https://github.com/hybridgroup/yzma)
 
