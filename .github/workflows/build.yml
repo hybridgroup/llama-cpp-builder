@@ -1156,6 +1156,10 @@ jobs:
       - check-version
       - release
       - digests
+    # The github-pages environment permits a deployment from main only, so a run
+    # for a pull request stops here. Without this it fails at that gate, after the
+    # release and the manifest are already published.
+    if: ${{ github.event_name != 'pull_request' }}
     uses: ./.github/workflows/publish-version.yml
     with:
       tag_name: ${{ needs.check-version.outputs.llama-tag }}
