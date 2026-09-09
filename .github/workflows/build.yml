@@ -16,10 +16,10 @@ on:
     - cron: '15 * * * *'
     - cron: '45 * * * *'
 
-# Only one build of main can run at one time. A later run waits, then it reads
-# the tags again and stops if the release is complete.
+# Only one build of main runs at one time. A later run waits and reads the tags
+# again. A manual tag and a pull request each get a group of their own.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || inputs.tag && format('tag-{0}', inputs.tag) || 'main' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
