@@ -1097,10 +1097,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           .github/scripts/fetch-file-digests.sh "${{ github.run_id }}" files-digests
+      # The macOS archive comes from upstream, so its file digests need a download.
+      # It is small, and it is what a macOS arm64 client installs.
+      - name: Hash the upstream macOS archive
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.check-version.outputs.llama-tag }}
+        run: |
+          if [ -f "digests/${TAG}.json" ]; then
+            echo "digests/${TAG}.json is already published, no download"
+            exit 0
+          fi
+          .github/scripts/hash-upstream-files.sh "${TAG}" upstream-files-digests
       - name: Build the digest manifest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FILES_DIR: files-digests
+          UPSTREAM_FILES_DIR: upstream-files-digests
         run: |
           .github/scripts/build-digests.sh "${{ needs.check-version.outputs.llama-tag }}"
       - name: Commit the digest manifest

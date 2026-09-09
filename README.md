@@ -155,9 +155,12 @@ removes the archive after it extracts it, so these let it check an installation 
 `links` gives the name that each symbolic link points to, because a link has no bytes of
 its own.
 
-Each build job hashes its own output before it packs it, so the file digests cost no
-download. Only this repo builds its assets, so an asset from `ggml-org/llama.cpp` has
-`sha256` but no `files`. A client must accept an asset that has no `files`.
+Each build job hashes its own output before it packs it, so the file digests of an asset
+that this repo builds cost no download. The macOS arm64 archive comes from
+`ggml-org/llama.cpp`, and the digests job downloads and unpacks it to get the same digests,
+because that archive is what a macOS arm64 client installs. Each other asset from
+`ggml-org/llama.cpp` has `sha256` but no `files`. A client must accept an asset that has no
+`files`.
 
 ### How to check a download
 
@@ -183,6 +186,9 @@ jq -r --arg a "$ASSET" \
    | to_entries[] | "\(.value)  \(.key)"' $TAG.json > sums.txt
 (cd /path/to/lib && sha256sum -c /path/to/sums.txt)
 ```
+
+For a macOS arm64 installation, the source key is `ggml-org/llama.cpp` and the asset is
+`llama-<upstream tag>-bin-macos-arm64.tar.gz`, with the `upstream_tag` of the manifest.
 
 ### The manifest digest
 
@@ -224,7 +230,8 @@ The manifests are in [digests/](./digests) in this repo. The release workflow co
 to the site and uploads each one to its own release. A manifest is written one time and is
 not rewritten, so a pin stays good. The manifests that seeded the directory hold only
 `sha256`, because their releases are older than the build step that makes the file
-digests.
+digests. For the same reason, the file digests of the macOS arm64 archive start with the
+first build after this repo added them.
 
 The digests come from the GitHub release API, so they show that an archive is the archive
 that was published. They are not a signature, and they do not show who built it. A pin

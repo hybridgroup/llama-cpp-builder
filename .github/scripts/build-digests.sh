@@ -8,7 +8,8 @@
 #
 # When FILES_DIR names a directory that holds <asset>.files.json files, as
 # hash-files.sh writes them, the digest of each file in those assets goes in too. A
-# client can then check an installation after the archive is gone.
+# client can then check an installation after the archive is gone. UPSTREAM_FILES_DIR
+# does the same for the assets of the upstream repo.
 #
 # Usage: build-digests.sh <tag> [output-dir]
 # GH_TOKEN must hold a token that can read the two release pages.
@@ -19,7 +20,10 @@ TAG="${1:?usage: build-digests.sh <tag> [output-dir]}"
 OUT_DIR="${2:-digests}"
 
 BUILDER_REPO="hybridgroup/llama-cpp-builder"
-UPSTREAM_REPO="ggml-org/llama.cpp"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# upstream-tag.sh sets UPSTREAM_REPO and defines upstream_tag_for.
+source "${SCRIPT_DIR}/upstream-tag.sh"
 
 # A manifest that is published is never rewritten. A client can pin a tag and expect
 # the digests to stay the same. Set FORCE=1 to correct a manifest by hand.
@@ -28,21 +32,7 @@ if [ -f "${OUT_DIR}/${TAG}.json" ] && [ "${FORCE:-0}" != "1" ]; then
   exit 0
 fi
 
-# A nightly tag such as "b10783" names its own upstream assets. A tagged release such
-# as "v0.3.0" has no binaries of its own, so nightly-tag.txt gives the build that has
-# them. This is the rule that yzma uses.
-if [[ "$TAG" =~ ^b[0-9]+$ ]]; then
-  UPSTREAM_TAG="$TAG"
-else
-  UPSTREAM_TAG=$(curl -sfL \
-    "https://github.com/${UPSTREAM_REPO}/releases/download/${TAG}/nightly-tag.txt" |
-    tr -d '[:space:]')
-fi
-
-if [[ ! "$UPSTREAM_TAG" =~ ^b[0-9]+$ ]]; then
-  echo "build-digests: no upstream build tag for ${TAG}" >&2
-  exit 1
-fi
+UPSTREAM_TAG=$(upstream_tag_for "$TAG")
 
 # The manifest is published as an asset of the release that it describes, so it must
 # not list itself. A manifest that named its own digest could never be rebuilt.
@@ -75,20 +65,36 @@ fi
 BUILDER_ASSETS=$(assets_for "$BUILDER_REPO" "$TAG")
 UPSTREAM_ASSETS=$(assets_for "$UPSTREAM_REPO" "$UPSTREAM_TAG")
 
-# The build jobs hash their own output before they pack it, so the file digests cost
-# no download. Only this repo builds its assets, so only its assets get them.
-if [ -n "${FILES_DIR:-}" ] && [ -d "$FILES_DIR" ]; then
-  WITH_FILES=0
-  for name in $(jq -r 'keys[]' <<<"$BUILDER_ASSETS"); do
-    [ -f "${FILES_DIR}/${name}.files.json" ] || continue
-    BUILDER_ASSETS=$(jq \
+# The build jobs hash their own output before they pack it, so the file digests of a
+# builder asset cost no download. An upstream asset must be downloaded and unpacked, so
+# hash-upstream-files.sh does that for the macOS arm64 archive only.
+#
+# The two sets stay in two directories, because an asset name can occur in both sources
+# with different bytes. One directory could put the digests of one source on the asset
+# of the other source.
+merge_files() {
+  local dir="$1" assets="$2" label="$3" name count=0
+
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    printf '%s' "$assets"
+    return 0
+  fi
+
+  for name in $(jq -r 'keys[]' <<<"$assets"); do
+    [ -f "${dir}/${name}.files.json" ] || continue
+    assets=$(jq \
       --arg name "$name" \
-      --slurpfile contents "${FILES_DIR}/${name}.files.json" \
-      '.[$name] += $contents[0]' <<<"$BUILDER_ASSETS")
-    WITH_FILES=$((WITH_FILES + 1))
+      --slurpfile contents "${dir}/${name}.files.json" \
+      '.[$name] += $contents[0]' <<<"$assets")
+    count=$((count + 1))
   done
-  echo "build-digests: ${WITH_FILES} assets have file digests"
-fi
+
+  echo "build-digests: ${count} ${label} assets have file digests" >&2
+  printf '%s' "$assets"
+}
+
+BUILDER_ASSETS=$(merge_files "${FILES_DIR:-}" "$BUILDER_ASSETS" "$BUILDER_REPO")
+UPSTREAM_ASSETS=$(merge_files "${UPSTREAM_FILES_DIR:-}" "$UPSTREAM_ASSETS" "$UPSTREAM_REPO")
 
 if [ "$(jq 'length' <<<"$BUILDER_ASSETS")" -eq 0 ]; then
   echo "build-digests: ${BUILDER_REPO} ${TAG} published no assets" >&2
