@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 6
+#define YZMA_ABI_VERSION 7
 
 // Error codes. These are also in the Go code.
 enum {
@@ -945,6 +945,75 @@ int yzma_get_embeddings_seq(int ctx, int seq_id, float * out, int n) {
         return YZMA_ERR_GENERIC;
     }
     memcpy(out, embd, (size_t) n * sizeof(float));
+    return n;
+}
+
+// yzma_get_embeddings_ith copies n float values of the embedding of one token
+// into out. An i of -1 takes the last token that has an embedding.
+int yzma_get_embeddings_ith(int ctx, int i, float * out, int n) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const float * embd = llama_get_embeddings_ith(c, i);
+    if (embd == nullptr) {
+        set_error("context %d has no embedding for token %d", ctx, i);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, embd, (size_t) n * sizeof(float));
+    return n;
+}
+
+// yzma_get_embeddings copies n float values of the embeddings of the last
+// batch into out. The embeddings of the tokens follow each other.
+int yzma_get_embeddings(int ctx, float * out, int n) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const float * embd = llama_get_embeddings(c);
+    if (embd == nullptr) {
+        set_error("context %d has no embeddings", ctx);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, embd, (size_t) n * sizeof(float));
+    return n;
+}
+
+// yzma_get_logits_ith copies n float values of the logits of one token into
+// out. An i of -1 takes the last token that has logits.
+int yzma_get_logits_ith(int ctx, int i, float * out, int n) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const float * logits = llama_get_logits_ith(c, i);
+    if (logits == nullptr) {
+        set_error("context %d has no logits for token %d", ctx, i);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, logits, (size_t) n * sizeof(float));
+    return n;
+}
+
+// yzma_get_logits copies n float values of the logits of the last batch into
+// out. The logits of the tokens follow each other, thus n is the number of
+// tokens with logits times the size of the vocabulary.
+int yzma_get_logits(int ctx, float * out, int n) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const float * logits = llama_get_logits(c);
+    if (logits == nullptr) {
+        set_error("context %d has no logits", ctx);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, logits, (size_t) n * sizeof(float));
     return n;
 }
 
