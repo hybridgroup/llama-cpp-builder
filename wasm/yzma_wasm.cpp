@@ -457,6 +457,52 @@ int yzma_context_n_ctx_seq(int ctx) {
     return (int) llama_n_ctx_seq(c);
 }
 
+// yzma_context_pooling_type gives how the context pools the embeddings. A
+// pooling type can be -1, thus a bad handle gives YZMA_ERR_BAD_HANDLE.
+int yzma_context_pooling_type(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return (int) llama_pooling_type(c);
+}
+
+// yzma_set_embeddings says if a decode gives the embeddings in place of the
+// logits.
+int yzma_set_embeddings(int ctx, int embeddings) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    llama_set_embeddings(c, embeddings != 0);
+    return YZMA_OK;
+}
+
+// yzma_set_causal_attn says if the attention is causal. An embedding model
+// needs the attention of every token to every other one.
+int yzma_set_causal_attn(int ctx, int causal) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    llama_set_causal_attn(c, causal != 0);
+    return YZMA_OK;
+}
+
+// yzma_synchronize waits for the computation of the context to end.
+int yzma_synchronize(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    llama_synchronize(c);
+    return YZMA_OK;
+}
+
 // memory_of gives the memory of a context, or nullptr with the error set.
 static llama_memory_t memory_of(int ctx) {
     llama_context * c = contexts.get(ctx);

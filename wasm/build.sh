@@ -181,6 +181,7 @@ if [[ $webgpu -eq 1 ]]; then
         "yzma_context_new_seq"
         "yzma_context_free"
         "yzma_memory_clear"
+        "yzma_synchronize"
         "yzma_decode"
         "yzma_encode"
         "yzma_decode_batch"
