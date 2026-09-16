@@ -69,8 +69,8 @@ fi
 
 # The list of exported functions comes from the shim, so the two cannot get out
 # of step. Emscripten needs a leading underscore on each name.
-exports="$(grep -oE '^(int|void|float) (yzma_[a-z0-9_]+)\(' "$here/yzma_wasm.cpp" \
-    | sed -E 's/^(int|void|float) /_/; s/\($//' | sort -u | paste -sd, -)"
+exports="$(grep -oE '^(int|void|float|double) (yzma_[a-z0-9_]+)\(' "$here/yzma_wasm.cpp" \
+    | sed -E 's/^(int|void|float|double) /_/; s/\($//' | sort -u | paste -sd, -)"
 exports="_malloc,_free,${exports}"
 echo "exported functions: $exports"
 
