@@ -1171,31 +1171,18 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger yzma repo Linux build
+      # Each yzma test workflow accepts a manual start, so a new release can run
+      # them all against the libraries it publishes.
+      - name: Trigger the yzma tests
+        env:
+          GH_TOKEN: ${{ secrets.YZMA_BUILD_ACCESS }}
         run: |
-          curl -X POST \
-          -H "Authorization: Bearer ${{secrets.YZMA_BUILD_ACCESS}}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/hybridgroup/yzma/actions/workflows/linux.yml/dispatches \
-          -d '{"ref": "main"}'
-      - name: Trigger yzma repo macOS build
-        run: |
-          curl -X POST \
-          -H "Authorization: Bearer ${{secrets.YZMA_BUILD_ACCESS}}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/hybridgroup/yzma/actions/workflows/macos.yml/dispatches \
-          -d '{"ref": "main"}'
-      - name: Trigger yzma repo Windows build
-        run: |
-          curl -X POST \
-          -H "Authorization: Bearer ${{secrets.YZMA_BUILD_ACCESS}}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/hybridgroup/yzma/actions/workflows/windows.yml/dispatches \
-          -d '{"ref": "main"}'
-      - name: Trigger yzma repo FFI checker
-        run: |
-          curl -X POST \
-          -H "Authorization: Bearer ${{secrets.YZMA_BUILD_ACCESS}}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/hybridgroup/yzma/actions/workflows/checker.yml/dispatches \
-          -d '{"ref": "main"}'
+          set -e
+          for workflow in linux.yml macos.yml windows.yml wasm.yml checker.yml; do
+            echo "Triggering ${workflow}"
+            curl -X POST --fail-with-body \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/hybridgroup/yzma/actions/workflows/${workflow}/dispatches" \
+            -d '{"ref": "main"}'
+          done
