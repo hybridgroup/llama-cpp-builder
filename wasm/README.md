@@ -33,7 +33,7 @@ The generation loop stays in Go: one `yzma_decode` and one
 | 4 | `yzma_mtmd_init_from_file` also takes the bounds of the tokens of an image. |
 | 5 | The rest of the vocabulary and of the samplers. |
 | 6 | Batches with positions, the calls for the memory of a sequence, and the sizes of a context. |
-| 7 | The calls that read what the model computes: `yzma_get_logits_ith`, `yzma_get_logits`, `yzma_get_embeddings_ith`, and `yzma_get_embeddings`. `yzma_set_sampler` and the `yzma_get_sampled_*` calls give the backend sampling of llama.cpp. |
+| 7 | The calls that read what the model computes: `yzma_get_logits_ith`, `yzma_get_logits`, `yzma_get_embeddings_ith`, and `yzma_get_embeddings`. `yzma_set_sampler` and the `yzma_get_sampled_*` calls give the backend sampling of llama.cpp. `yzma_set_embeddings`, `yzma_set_causal_attn`, and `yzma_context_pooling_type` change a context after it is made, and `yzma_synchronize` waits for the computation to end. |
 
 `pkg/llamawasm` drives every version from 1 up to the one it knows, and tests
 for a call before it uses it, so a new yzma still works with the modules of an
