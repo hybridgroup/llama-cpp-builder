@@ -1315,6 +1315,110 @@ void yzma_sampler_free(int smpl) {
 }
 
 //
+// backend sampling
+//
+// llama.cpp can put the sampler in the compute graph, thus the backend gives
+// the token and the values that made it. This is experimental in llama.cpp.
+//
+
+// yzma_set_sampler attaches a sampler to a sequence of a context. It gives 1
+// when the backend takes the sampler and 0 when it does not.
+int yzma_set_sampler(int ctx, int seq_id, int smpl) {
+    llama_context * c = contexts.get(ctx);
+    llama_sampler * s = samplers.get(smpl);
+    if (c == nullptr || s == nullptr) {
+        set_error("invalid handle: context %d, sampler %d", ctx, smpl);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_set_sampler(c, (llama_seq_id) seq_id, s) ? 1 : 0;
+}
+
+// yzma_get_sampled_token_ith gives the token that the backend sampled for the
+// output at i. A token can be -1, thus a bad handle gives
+// YZMA_ERR_BAD_HANDLE.
+int yzma_get_sampled_token_ith(int ctx, int i) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_get_sampled_token_ith(c, i);
+}
+
+// sampled_count gives the number of values of one of the three arrays that
+// the backend sampler makes.
+static int sampled_count(int ctx, int i, uint32_t (*count)(llama_context *, int32_t)) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) count(c, i);
+}
+
+int yzma_get_sampled_probs_count_ith(int ctx, int i) {
+    return sampled_count(ctx, i, llama_get_sampled_probs_count_ith);
+}
+
+int yzma_get_sampled_logits_count_ith(int ctx, int i) {
+    return sampled_count(ctx, i, llama_get_sampled_logits_count_ith);
+}
+
+int yzma_get_sampled_candidates_count_ith(int ctx, int i) {
+    return sampled_count(ctx, i, llama_get_sampled_candidates_count_ith);
+}
+
+// yzma_get_sampled_probs_ith copies n probabilities of the output at i into
+// out. The count call gives n.
+int yzma_get_sampled_probs_ith(int ctx, int i, float * out, int n) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const float * probs = llama_get_sampled_probs_ith(c, i);
+    if (probs == nullptr) {
+        set_error("context %d has no sampled probabilities for output %d", ctx, i);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, probs, (size_t) n * sizeof(float));
+    return n;
+}
+
+// yzma_get_sampled_logits_ith copies n logits of the output at i into out.
+int yzma_get_sampled_logits_ith(int ctx, int i, float * out, int n) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const float * logits = llama_get_sampled_logits_ith(c, i);
+    if (logits == nullptr) {
+        set_error("context %d has no sampled logits for output %d", ctx, i);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, logits, (size_t) n * sizeof(float));
+    return n;
+}
+
+// yzma_get_sampled_candidates_ith copies n token identifiers of the output at
+// i into out.
+int yzma_get_sampled_candidates_ith(int ctx, int i, int * out, int n) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const llama_token * tokens = llama_get_sampled_candidates_ith(c, i);
+    if (tokens == nullptr) {
+        set_error("context %d has no sampled candidates for output %d", ctx, i);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, tokens, (size_t) n * sizeof(int));
+    return n;
+}
+
+//
 // multimodal
 //
 // These calls follow the mtmd library of llama.cpp. A program makes a bitmap
