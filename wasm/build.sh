@@ -175,6 +175,7 @@ if [[ $webgpu -eq 1 ]]; then
         "yzma_backend_init"
         "yzma_backend_free"
         "yzma_gpu_device"
+        "yzma_backend_check"
         "yzma_model_load"
         "yzma_model_free"
         "yzma_context_new"

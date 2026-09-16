@@ -34,6 +34,7 @@ The generation loop stays in Go: one `yzma_decode` and one
 | 5 | The rest of the vocabulary and of the samplers. |
 | 6 | Batches with positions, the calls for the memory of a sequence, and the sizes of a context. |
 | 7 | The calls that read the logits and the embeddings of a batch, the calls for the backend sampling of llama.cpp, the calls that change a context after it is made, and the calls that describe a model and the threads of a context. |
+| 8 | `yzma_backend_check`, which compares the device against the CPU. |
 
 `pkg/llamawasm` drives every version from 1 up to the one it knows, and tests
 for a call before it uses it, so a new yzma still works with the modules of an

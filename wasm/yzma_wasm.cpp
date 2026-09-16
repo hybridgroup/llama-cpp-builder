@@ -16,18 +16,21 @@
 // Increase YZMA_ABI_VERSION each time you change this interface. The Go code
 // compares the value at startup and refuses a module that does not match.
 
+#include "ggml.h"
+#include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "llama.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
 
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 7
+#define YZMA_ABI_VERSION 8
 
 // Error codes. These are also in the Go code.
 enum {
@@ -167,6 +170,77 @@ void log_callback(ggml_log_level level, const char * text, void * /* user_data *
     fputs(text, stderr);
 }
 
+// check_nmse is the normalized mean squared error of test against ref, which is
+// mse(ref, test) divided by mse(ref, 0). The same measure that the
+// test-backend-ops program of llama.cpp uses.
+double check_nmse(const float * ref, const float * test, size_t n) {
+    double num = 0.0;
+    double den = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        const double d = (double) ref[i] - (double) test[i];
+        num += d * d;
+        den += (double) ref[i] * (double) ref[i];
+    }
+    if (den == 0.0) {
+        return num == 0.0 ? 0.0 : 1.0;
+    }
+    return num / den;
+}
+
+// The shape of the graph of the self test. A matrix multiply of f16 weights by
+// f32 activations is the op that a language model spends most of its time in,
+// and the WebGPU backend needs f16 shaders, so this covers the path that
+// matters.
+enum {
+    CHECK_K = 256, // length of a row
+    CHECK_M = 64,  // rows of the weights
+    CHECK_N = 8,   // columns of the activations
+    CHECK_OUT = CHECK_M * CHECK_N,
+};
+
+// check_run builds the graph on one backend, fills it with the given values,
+// and writes the result into out. It returns false if any step fails.
+bool check_run(ggml_backend_t backend, const ggml_fp16_t * wdata, const float * adata, float * out) {
+    ggml_init_params ip = {};
+    ip.mem_size   = ggml_tensor_overhead() * 8 + ggml_graph_overhead();
+    ip.mem_buffer = nullptr;
+    ip.no_alloc   = true;
+
+    ggml_context * ctx = ggml_init(ip);
+    if (ctx == nullptr) {
+        set_error("self test cannot make a ggml context");
+        return false;
+    }
+
+    ggml_tensor * w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, CHECK_K, CHECK_M);
+    ggml_tensor * a = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, CHECK_K, CHECK_N);
+    ggml_tensor * r = ggml_mul_mat(ctx, w, a);
+
+    ggml_cgraph * graph = ggml_new_graph(ctx);
+    ggml_build_forward_expand(graph, r);
+
+    ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors(ctx, backend);
+    if (buf == nullptr) {
+        set_error("self test cannot allocate the tensors of %s", ggml_backend_name(backend));
+        ggml_free(ctx);
+        return false;
+    }
+
+    ggml_backend_tensor_set(w, wdata, 0, ggml_nbytes(w));
+    ggml_backend_tensor_set(a, adata, 0, ggml_nbytes(a));
+
+    const bool ok = ggml_backend_graph_compute(backend, graph) == GGML_STATUS_SUCCESS;
+    if (ok) {
+        ggml_backend_tensor_get(r, out, 0, ggml_nbytes(r));
+    } else {
+        set_error("self test cannot compute the graph on %s", ggml_backend_name(backend));
+    }
+
+    ggml_backend_buffer_free(buf);
+    ggml_free(ctx);
+    return ok;
+}
+
 } // namespace
 
 extern "C" {
@@ -223,6 +297,95 @@ int yzma_gpu_device(char * buf, int cap) {
     }
 
     return 0;
+}
+
+// yzma_backend_check tests the device that is not the CPU. It runs one small
+// matrix multiply on that device and the same one on the CPU, then compares the
+// two results. The return value is 0 if the device agrees with the CPU, 1 if it
+// gives wrong values, and a negative error code if the test cannot run.
+//
+// Some drivers give a WebGPU adapter that llama.cpp accepts and that then
+// computes nonsense. A model on such a device answers with random tokens of the
+// vocabulary. No property of the answer tells this apart from a weak model, so
+// the only sure test is a comparison against the CPU.
+//
+// Call this after yzma_backend_init and before a model loads. The return value
+// of 0 also comes back for a build that has only the CPU, because then there is
+// nothing to test.
+int yzma_backend_check(void) {
+    ggml_backend_dev_t gpu = nullptr;
+
+    const size_t count = ggml_backend_dev_count();
+    for (size_t i = 0; i < count; i++) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        if (dev != nullptr && ggml_backend_dev_type(dev) != GGML_BACKEND_DEVICE_TYPE_CPU) {
+            gpu = dev;
+            break;
+        }
+    }
+    if (gpu == nullptr) {
+        return 0;
+    }
+
+    ggml_backend_dev_t cpu = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+    if (cpu == nullptr) {
+        set_error("self test has no CPU device to compare against");
+        return YZMA_ERR_GENERIC;
+    }
+
+    // The values stay in [-1,1] and come from a fixed sequence, so every run of
+    // the test gives the same numbers.
+    std::vector<ggml_fp16_t> wdata(CHECK_K * CHECK_M);
+    std::vector<float>       adata(CHECK_K * CHECK_N);
+    uint32_t seed = 1234567u;
+    auto next = [&seed]() {
+        seed = seed * 1664525u + 1013904223u;
+        return (float) ((double) (seed >> 8) / (double) (1u << 23)) - 1.0f;
+    };
+    for (size_t i = 0; i < wdata.size(); i++) {
+        wdata[i] = ggml_fp32_to_fp16(next());
+    }
+    for (size_t i = 0; i < adata.size(); i++) {
+        adata[i] = next();
+    }
+
+    ggml_backend_t gpu_backend = ggml_backend_dev_init(gpu, nullptr);
+    if (gpu_backend == nullptr) {
+        set_error("self test cannot start the %s backend", ggml_backend_dev_name(gpu));
+        return YZMA_ERR_GENERIC;
+    }
+    ggml_backend_t cpu_backend = ggml_backend_dev_init(cpu, nullptr);
+    if (cpu_backend == nullptr) {
+        set_error("self test cannot start the CPU backend");
+        ggml_backend_free(gpu_backend);
+        return YZMA_ERR_GENERIC;
+    }
+
+    std::vector<float> got(CHECK_OUT);
+    std::vector<float> want(CHECK_OUT);
+
+    int result = YZMA_ERR_GENERIC;
+    if (check_run(cpu_backend, wdata.data(), adata.data(), want.data()) &&
+        check_run(gpu_backend, wdata.data(), adata.data(), got.data())) {
+
+        // A correct f16 multiply on a GPU differs from the CPU only in the last
+        // bits, which gives an error near 1e-6. Noise gives an error near 1.
+        // The limit sits far from both, so a slow or an odd but correct driver
+        // does not raise a false alarm.
+        // A value that is not a number makes the error not a number, and an
+        // infinite value makes it infinite. Neither is less than the limit,
+        // thus this one test covers those results as well.
+        const double err = check_nmse(want.data(), got.data(), want.size());
+
+        result = err < 1e-2 ? 0 : 1;
+        if (result == 1) {
+            set_error("the %s backend gives wrong values, error %g", ggml_backend_dev_name(gpu), err);
+        }
+    }
+
+    ggml_backend_free(cpu_backend);
+    ggml_backend_free(gpu_backend);
+    return result;
 }
 
 void yzma_backend_init(void) {
