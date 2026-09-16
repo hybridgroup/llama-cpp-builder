@@ -292,6 +292,186 @@ int yzma_model_n_ctx_train(int model) {
     return llama_model_n_ctx_train(m);
 }
 
+// The calls that describe a model. Each one gives YZMA_ERR_HANDLE for a bad
+// handle, except the two whose normal result can be negative.
+
+int yzma_model_n_embd_inp(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_n_embd_inp(m);
+}
+
+int yzma_model_n_embd_out(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_n_embd_out(m);
+}
+
+int yzma_model_n_layer(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_n_layer(m);
+}
+
+int yzma_model_n_layer_nextn(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_n_layer_nextn(m);
+}
+
+int yzma_model_n_head(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_n_head(m);
+}
+
+int yzma_model_n_head_kv(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_n_head_kv(m);
+}
+
+int yzma_model_n_swa(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_n_swa(m);
+}
+
+int yzma_model_n_cls_out(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_n_cls_out(m);
+}
+
+int yzma_model_ftype(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_ftype(m);
+}
+
+int yzma_model_has_encoder(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_has_encoder(m);
+}
+
+int yzma_model_has_decoder(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_has_decoder(m);
+}
+
+int yzma_model_is_recurrent(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_is_recurrent(m);
+}
+
+int yzma_model_is_hybrid(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_is_hybrid(m);
+}
+
+int yzma_model_is_diffusion(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_model_is_diffusion(m);
+}
+
+// A rope type and the start token of a decoder can be -1, thus a bad handle
+// gives YZMA_ERR_BAD_HANDLE.
+int yzma_model_rope_type(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return (int) llama_model_rope_type(m);
+}
+
+int yzma_model_decoder_start_token(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+    return llama_model_decoder_start_token(m);
+}
+
+// A size and a number of parameters do not fit an int, thus these give a
+// double. It holds every whole number to 2^53, which is far above the size of
+// a model. A bad handle gives -1.
+double yzma_model_size(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return -1;
+    }
+    return (double) llama_model_size(m);
+}
+
+double yzma_model_n_params(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return -1;
+    }
+    return (double) llama_model_n_params(m);
+}
+
+// A bad handle gives 0, which is not a scale that a model uses.
+float yzma_model_rope_freq_scale_train(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return 0;
+    }
+    return llama_model_rope_freq_scale_train(m);
+}
+
 int yzma_model_desc(int model, char * buf, int cap) {
     llama_model * m = models.get(model);
     if (m == nullptr) {
@@ -455,6 +635,44 @@ int yzma_context_n_ctx_seq(int ctx) {
         return YZMA_ERR_HANDLE;
     }
     return (int) llama_n_ctx_seq(c);
+}
+
+int yzma_context_n_threads(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_n_threads(c);
+}
+
+int yzma_context_n_threads_batch(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_n_threads_batch(c);
+}
+
+int yzma_context_n_rs_seq(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) llama_n_rs_seq(c);
+}
+
+// yzma_set_n_threads changes the threads of a context after it is made.
+int yzma_set_n_threads(int ctx, int n_threads, int n_threads_batch) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    llama_set_n_threads(c, n_threads, n_threads_batch);
+    return YZMA_OK;
 }
 
 // yzma_context_pooling_type gives how the context pools the embeddings. A
