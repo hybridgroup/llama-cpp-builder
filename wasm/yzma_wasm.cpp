@@ -30,7 +30,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 8
+#define YZMA_ABI_VERSION 9
 
 // Error codes. These are also in the Go code.
 enum {
@@ -700,7 +700,7 @@ int yzma_chat_apply_template(int model, const char * role, const char * content,
 //
 
 static int context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
-                       int embeddings, int pooling_type, int n_seq_max) {
+                       int embeddings, int pooling_type, int n_seq_max, int no_perf) {
     llama_model * m = models.get(model);
     if (m == nullptr) {
         set_error("invalid model handle %d", model);
@@ -726,6 +726,7 @@ static int context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_th
     }
     params.embeddings   = embeddings != 0;
     params.pooling_type = (enum llama_pooling_type) pooling_type;
+    params.no_perf      = no_perf != 0;
 
     llama_context * ctx = llama_init_from_model(m, params);
     if (ctx == nullptr) {
@@ -738,14 +739,21 @@ static int context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_th
 // yzma_context_new makes a context that holds one sequence.
 int yzma_context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
                      int embeddings, int pooling_type) {
-    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, 1);
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, 1, 1);
 }
 
 // yzma_context_new_seq makes a context that holds n_seq_max sequences. A batch
 // that carries more than one sequence needs it.
 int yzma_context_new_seq(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
                          int embeddings, int pooling_type, int n_seq_max) {
-    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max);
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max, 1);
+}
+
+// yzma_context_new_ext also takes no_perf. A context with no_perf 0 measures
+// the time of each batch, which yzma_perf_context gives.
+int yzma_context_new_ext(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
+                         int embeddings, int pooling_type, int n_seq_max, int no_perf) {
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max, no_perf);
 }
 
 void yzma_context_free(int ctx) {
@@ -2049,6 +2057,240 @@ int yzma_mtmd_helper_eval_chunks(int mctx, int ctx, int chunks, int n_past, int 
         return YZMA_ERR_GENERIC;
     }
     return (int) new_n_past;
+}
+
+//
+// metadata
+//
+
+// copy_string copies s into buf and returns the number of bytes copied. A null
+// s gives 0.
+static int copy_string(const char * s, char * buf, int cap) {
+    if (s == nullptr) {
+        return 0;
+    }
+    const int n = (int) strlen(s);
+    if (cap < n + 1) {
+        return YZMA_ERR_TOO_SMALL;
+    }
+    memcpy(buf, s, (size_t) n + 1);
+    return n;
+}
+
+int yzma_model_meta_count(int model) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_model_meta_count(m);
+}
+
+// The meta calls give the length of the whole value, as snprintf does. A length
+// that is not less than cap tells that buf holds only the start of the value.
+// A key that is not in the model gives -1.
+int yzma_model_meta_key_by_index(int model, int i, char * buf, int cap) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_model_meta_key_by_index(m, i, buf, (size_t) cap);
+}
+
+int yzma_model_meta_val_str_by_index(int model, int i, char * buf, int cap) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_model_meta_val_str_by_index(m, i, buf, (size_t) cap);
+}
+
+int yzma_model_meta_val_str(int model, const char * key, char * buf, int cap) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_model_meta_val_str(m, key, buf, (size_t) cap);
+}
+
+// yzma_model_meta_key_str copies the name of a key of llama_model_meta_key into
+// buf. A key that is not known gives 0.
+int yzma_model_meta_key_str(int key, char * buf, int cap) {
+    return copy_string(llama_model_meta_key_str((enum llama_model_meta_key) key), buf, cap);
+}
+
+// yzma_model_cls_label copies the label of output i of a classifier into buf. A
+// model with no label for i gives 0.
+int yzma_model_cls_label(int model, int i, char * buf, int cap) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return copy_string(llama_model_cls_label(m, (uint32_t) i), buf, cap);
+}
+
+//
+// state
+//
+// A state can be larger than an int, thus these give a double. A bad handle
+// gives -1 and a failure of llama.cpp gives 0, as the C API does.
+//
+
+double yzma_state_get_size(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return -1;
+    }
+    return (double) llama_state_get_size(c);
+}
+
+double yzma_state_get_data(int ctx, uint8_t * dst, double size) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return -1;
+    }
+    return (double) llama_state_get_data(c, dst, (size_t) size);
+}
+
+double yzma_state_set_data(int ctx, const uint8_t * src, double size) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return -1;
+    }
+    return (double) llama_state_set_data(c, src, (size_t) size);
+}
+
+double yzma_state_seq_get_size_ext(int ctx, int seq_id, int flags) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return -1;
+    }
+    return (double) llama_state_seq_get_size_ext(c, seq_id, (llama_state_seq_flags) flags);
+}
+
+double yzma_state_seq_get_data_ext(int ctx, uint8_t * dst, double size, int seq_id, int flags) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return -1;
+    }
+    return (double) llama_state_seq_get_data_ext(c, dst, (size_t) size, seq_id, (llama_state_seq_flags) flags);
+}
+
+double yzma_state_seq_set_data_ext(int ctx, const uint8_t * src, double size, int dest_seq_id, int flags) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return -1;
+    }
+    return (double) llama_state_seq_set_data_ext(c, src, (size_t) size, dest_seq_id, (llama_state_seq_flags) flags);
+}
+
+//
+// performance
+//
+
+// yzma_perf_context writes t_start_ms, t_load_ms, t_p_eval_ms, t_eval_ms,
+// n_p_eval, n_eval, and n_reused into out, in that order, and returns 7. The
+// times stay 0 for a context that has no_perf.
+int yzma_perf_context(int ctx, double * out) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const llama_perf_context_data data = llama_perf_context(c);
+    out[0] = data.t_start_ms;
+    out[1] = data.t_load_ms;
+    out[2] = data.t_p_eval_ms;
+    out[3] = data.t_eval_ms;
+    out[4] = data.n_p_eval;
+    out[5] = data.n_eval;
+    out[6] = data.n_reused;
+    return 7;
+}
+
+int yzma_perf_context_reset(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    llama_perf_context_reset(c);
+    return YZMA_OK;
+}
+
+// chain_of gives the sampler of a handle if it is a chain. llama.cpp stops the
+// program when the perf calls get a sampler that is not a chain.
+static llama_sampler * chain_of(int chain) {
+    llama_sampler * s = samplers.get(chain);
+    if (s == nullptr) {
+        set_error("invalid sampler handle %d", chain);
+        return nullptr;
+    }
+    if (strcmp(llama_sampler_name(s), "chain") != 0) {
+        set_error("sampler %d is not a chain", chain);
+        return nullptr;
+    }
+    return s;
+}
+
+// yzma_perf_sampler writes t_sample_ms and n_sample into out and returns 2.
+int yzma_perf_sampler(int chain, double * out) {
+    llama_sampler * s = chain_of(chain);
+    if (s == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    const llama_perf_sampler_data data = llama_perf_sampler(s);
+    out[0] = data.t_sample_ms;
+    out[1] = data.n_sample;
+    return 2;
+}
+
+int yzma_perf_sampler_reset(int chain) {
+    llama_sampler * s = chain_of(chain);
+    if (s == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    llama_perf_sampler_reset(s);
+    return YZMA_OK;
+}
+
+//
+// system
+//
+
+int yzma_print_system_info(char * buf, int cap) {
+    return copy_string(llama_print_system_info(), buf, cap);
+}
+
+int yzma_ftype_name(int ftype, char * buf, int cap) {
+    return copy_string(llama_ftype_name((enum llama_ftype) ftype), buf, cap);
+}
+
+// A time in microseconds does not fit an int, thus this gives a double.
+double yzma_time_us(void) {
+    return (double) llama_time_us();
+}
+
+int yzma_max_devices(void) {
+    return (int) llama_max_devices();
+}
+
+int yzma_max_parallel_sequences(void) {
+    return (int) llama_max_parallel_sequences();
+}
+
+int yzma_supports_gpu_offload(void) {
+    return (int) llama_supports_gpu_offload();
 }
 
 } // extern "C"
