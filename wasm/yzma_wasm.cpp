@@ -30,7 +30,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 9
+#define YZMA_ABI_VERSION 10
 
 // Error codes. These are also in the Go code.
 enum {
@@ -699,8 +699,10 @@ int yzma_chat_apply_template(int model, const char * role, const char * content,
 // context
 //
 
+// kv_unified below zero and n_outputs_max below one keep the defaults of llama.cpp.
 static int context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
-                       int embeddings, int pooling_type, int n_seq_max, int no_perf) {
+                       int embeddings, int pooling_type, int n_seq_max, int no_perf,
+                       int kv_unified, int n_outputs_max) {
     llama_model * m = models.get(model);
     if (m == nullptr) {
         set_error("invalid model handle %d", model);
@@ -727,6 +729,12 @@ static int context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_th
     params.embeddings   = embeddings != 0;
     params.pooling_type = (enum llama_pooling_type) pooling_type;
     params.no_perf      = no_perf != 0;
+    if (kv_unified >= 0) {
+        params.kv_unified = kv_unified != 0;
+    }
+    if (n_outputs_max > 0) {
+        params.n_outputs_max = (uint32_t) n_outputs_max;
+    }
 
     llama_context * ctx = llama_init_from_model(m, params);
     if (ctx == nullptr) {
@@ -739,21 +747,32 @@ static int context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_th
 // yzma_context_new makes a context that holds one sequence.
 int yzma_context_new(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
                      int embeddings, int pooling_type) {
-    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, 1, 1);
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, 1, 1, -1, 0);
 }
 
 // yzma_context_new_seq makes a context that holds n_seq_max sequences. A batch
 // that carries more than one sequence needs it.
 int yzma_context_new_seq(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
                          int embeddings, int pooling_type, int n_seq_max) {
-    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max, 1);
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max, 1, -1, 0);
 }
 
 // yzma_context_new_ext also takes no_perf. A context with no_perf 0 measures
 // the time of each batch, which yzma_perf_context gives.
 int yzma_context_new_ext(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
                          int embeddings, int pooling_type, int n_seq_max, int no_perf) {
-    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max, no_perf);
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max, no_perf, -1, 0);
+}
+
+// yzma_context_new_kv also takes kv_unified and n_outputs_max. With kv_unified
+// the sequences share one cache, so each of them can hold the whole context.
+// n_outputs_max bounds the outputs of one batch, and with it the buffer of the
+// logits that the context reserves.
+int yzma_context_new_kv(int model, int n_ctx, int n_batch, int n_ubatch, int n_threads,
+                        int embeddings, int pooling_type, int n_seq_max, int no_perf,
+                        int kv_unified, int n_outputs_max) {
+    return context_new(model, n_ctx, n_batch, n_ubatch, n_threads, embeddings, pooling_type, n_seq_max, no_perf,
+                       kv_unified, n_outputs_max);
 }
 
 void yzma_context_free(int ctx) {
