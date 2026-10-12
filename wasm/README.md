@@ -37,6 +37,7 @@ The generation loop stays in Go: one `yzma_decode` and one
 | 8 | `yzma_backend_check`, which compares the device against the CPU. |
 | 9 | The metadata of a model, the state of a context and of a sequence in memory, the performance counters, the information of the system, and `yzma_context_new_ext`, which also takes `no_perf`. |
 | 10 | `yzma_context_new_kv`, which also takes `kv_unified` and `n_outputs_max`. |
+| 11 | `yzma_process`, which runs an extended batch with the decision order of each token. |
 
 `pkg/llamawasm` drives every version from 1 up to the one it knows, and tests
 for a call before it uses it, so a new yzma still works with the modules of an

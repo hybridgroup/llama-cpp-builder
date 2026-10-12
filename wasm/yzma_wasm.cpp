@@ -20,6 +20,7 @@
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "llama.h"
+#include "llama-ext.h"
 #include "mtmd.h"
 #include "mtmd-helper.h"
 
@@ -30,7 +31,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 10
+#define YZMA_ABI_VERSION 11
 
 // Error codes. These are also in the Go code.
 enum {
@@ -1383,6 +1384,67 @@ int yzma_encode_batch(int ctx, const int * tokens, const int * pos, const int * 
                       const int * seq_ids, int n_seq_max, const signed char * logits,
                       int n_tokens) {
     return run_batch(ctx, tokens, pos, n_seq_id, seq_ids, n_seq_max, logits, n_tokens, true);
+}
+
+// yzma_process makes a llama_batch_ext out of the same arrays as yzma_decode_batch
+// and runs llama_process. order holds the decision order of each token, or is 0.
+int yzma_process(int ctx, int type, const int * tokens, const int * pos, const int * n_seq_id,
+                 const int * seq_ids, int n_seq_max, const signed char * outputs, const int * order,
+                 int n_tokens) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    if (n_tokens <= 0 || n_seq_max <= 0) {
+        set_error("a batch needs a minimum of one token and one sequence, got %d and %d",
+                  n_tokens, n_seq_max);
+        return YZMA_ERR_GENERIC;
+    }
+
+    llama_batch_ext * batch = llama_batch_ext_init(c);
+    if (batch == nullptr) {
+        set_error("cannot make an extended batch for context %d", ctx);
+        return YZMA_ERR_ALLOC;
+    }
+
+    for (int i = 0; i < n_tokens; i++) {
+        const int * seqs = seq_ids + (size_t) i * (size_t) n_seq_max;
+        if (n_seq_id[i] < 1 || n_seq_id[i] > n_seq_max) {
+            llama_batch_ext_free(batch);
+            set_error("entry %d has %d sequences, want 1 to %d", i, n_seq_id[i], n_seq_max);
+            return YZMA_ERR_GENERIC;
+        }
+        const int32_t idx = llama_batch_ext_add_token(batch, seqs[0], tokens[i]);
+        if (idx < 0) {
+            llama_batch_ext_free(batch);
+            set_error("llama_batch_ext_add_token returned %d for entry %d", idx, i);
+            return YZMA_ERR_GENERIC;
+        }
+
+        bool ok = true;
+        for (int s = 1; s < n_seq_id[i] && ok; s++) {
+            ok = llama_batch_ext_add_seq(batch, idx, seqs[s]);
+        }
+        const llama_pos p = pos[i];
+        ok = ok && llama_batch_ext_set_pos(batch, idx, &p);
+        ok = ok && llama_batch_ext_set_output_logits(batch, idx, outputs[i] != 0);
+        if (ok && order != nullptr) {
+            ok = llama_batch_ext_set_decision_order(batch, idx, (enum llama_decision_order) order[i]);
+        }
+        if (!ok) {
+            llama_batch_ext_free(batch);
+            set_error("the batch rejected entry %d", i);
+            return YZMA_ERR_GENERIC;
+        }
+    }
+
+    const int rc = llama_process(c, (enum llama_process_type) type, batch);
+    llama_batch_ext_free(batch);
+    if (rc != 0) {
+        set_error("llama_process returned %d", rc);
+    }
+    return rc;
 }
 
 // yzma_get_embeddings_seq copies n float values of the embedding of a sequence
