@@ -67,6 +67,8 @@ add_subdirectory("${LLAMA_CPP_DIR}" llama.cpp EXCLUDE_FROM_ALL)
 
 add_executable(yzma_wasm yzma_wasm.cpp)
 target_link_libraries(yzma_wasm PRIVATE llama ggml mtmd)
+# llama-ext.h is the staging header of llama.cpp that has llama_batch_ext_set_decision_order.
+target_include_directories(yzma_wasm PRIVATE "${LLAMA_CPP_DIR}/src")
 
 # YZMA_WASM_EXPORTS and YZMA_WASM_LINK_FLAGS come from build.sh.
 if(DEFINED YZMA_WASM_EXPORTS)
