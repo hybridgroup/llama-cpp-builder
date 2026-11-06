@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 11
+#define YZMA_ABI_VERSION 12
 
 // Error codes. These are also in the Go code.
 enum {
@@ -663,6 +663,20 @@ int yzma_model_chat_template(int model, char * buf, int cap) {
     }
     memcpy(buf, tmpl, (size_t) n + 1);
     return n;
+}
+
+// yzma_model_decision_label copies the label of option index of a decision
+// model into buf. The return value is 0 if the model has no such label.
+int yzma_model_decision_label(int model, int index, char * buf, int cap) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    if (index < 0) {
+        return 0;
+    }
+    return copy_text(llama_model_decision_label(m, (uint32_t) index), buf, cap);
 }
 
 // yzma_chat_apply_template puts one message into the chat format of the model
