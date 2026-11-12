@@ -214,6 +214,13 @@ if [[ $webgpu -eq 1 ]]; then
         "yzma_mtmd_free"
         "yzma_mtmd_tokenize"
         "yzma_mtmd_helper_eval_chunks"
+        "yzma_mtmd_encode_chunk"
+        "yzma_mtmd_encode"
+        "yzma_mtmd_get_output_embd"
+        "yzma_mtmd_batch_init"
+        "yzma_mtmd_batch_free"
+        "yzma_mtmd_batch_encode"
+        "yzma_mtmd_batch_get_output_embd"
     )
 
     # Each one must also be in the list of exported functions, which has the
