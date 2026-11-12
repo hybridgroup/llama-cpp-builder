@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 12
+#define YZMA_ABI_VERSION 13
 
 // Error codes. These are also in the Go code.
 enum {
@@ -68,30 +68,49 @@ void set_error(const char * fmt, ...) {
 // A handle is borrowed if another object owns the item. yzma_sampler_chain_get
 // makes one, because the chain frees the samplers in it. The shim must not free
 // a borrowed item.
+//
+// A borrowed handle can name its owner, which is a handle in another table.
+// drop_owned_by removes the handles of an owner when the owner is freed.
 template <typename T>
 struct table {
     std::vector<T *> items;
     std::vector<bool> borrowed;
+    std::vector<int> owners;
 
     int add(T * item) {
-        return insert(item, false);
+        return insert(item, false, 0);
     }
 
-    int add_borrowed(T * item) {
-        return insert(item, true);
+    int add_borrowed(T * item, int owner = 0) {
+        return insert(item, true, owner);
     }
 
-    int insert(T * item, bool other_owner) {
+    int insert(T * item, bool other_owner, int owner) {
         for (size_t i = 0; i < items.size(); i++) {
             if (items[i] == nullptr) {
                 items[i] = item;
                 borrowed[i] = other_owner;
+                owners[i] = owner;
                 return (int) i + 1;
             }
         }
         items.push_back(item);
         borrowed.push_back(other_owner);
+        owners.push_back(owner);
         return (int) items.size();
+    }
+
+    std::vector<int> drop_owned_by(int owner) {
+        std::vector<int> dropped;
+        for (size_t i = 0; i < items.size(); i++) {
+            if (items[i] != nullptr && borrowed[i] && owners[i] == owner) {
+                items[i] = nullptr;
+                borrowed[i] = false;
+                owners[i] = 0;
+                dropped.push_back((int) i + 1);
+            }
+        }
+        return dropped;
     }
 
     T * get(int handle) const {
@@ -113,6 +132,7 @@ struct table {
         if (item != nullptr) {
             items[handle - 1] = nullptr;
             borrowed[handle - 1] = false;
+            owners[handle - 1] = 0;
         }
         return item;
     }
@@ -125,6 +145,22 @@ table<llama_sampler>            samplers;
 table<mtmd_context>             mtmd_contexts;
 table<mtmd_bitmap>              bitmaps;
 table<mtmd_input_chunks>        chunk_lists;
+table<mtmd_input_chunk>         chunks_one;
+table<const mtmd_image_tokens>  image_tokens;
+table<mtmd_batch>               mtmd_batches;
+
+// abort_flag is in the memory of the module. The build with threads has that
+// memory in a SharedArrayBuffer, so the page can set the flag during a decode.
+alignas(4) int32_t abort_flag = 0;
+
+bool abort_check(void * /* data */) {
+    return __atomic_load_n(&abort_flag, __ATOMIC_RELAXED) != 0;
+}
+
+// drop_chunk_children removes the image tokens that a chunk handle owns.
+void drop_chunk_children(int chunk) {
+    image_tokens.drop_owned_by(chunk);
+}
 
 // split_strings makes a vector of pointers into a buffer that holds n strings
 // with a NUL byte after each one. A pointer to an array of pointers cannot
@@ -1949,6 +1985,40 @@ int yzma_get_sampled_candidates_ith(int ctx, int i, int * out, int n) {
 }
 
 //
+// abort
+//
+// llama.cpp has no way to take a JavaScript function as the abort callback, so
+// the callback of the shim reads abort_flag. The CPU backend reads it after
+// each node of the graph. The WebGPU backend does not read it.
+//
+
+// yzma_set_abort_callback connects the flag to a context when on is not 0, and
+// disconnects it when on is 0.
+int yzma_set_abort_callback(int ctx, int on) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    llama_set_abort_callback(c, on != 0 ? abort_check : nullptr, nullptr);
+    return YZMA_OK;
+}
+
+// yzma_abort_flag gives the address of the flag. A page with the build that
+// has threads can write 1 there with Atomics.store to stop a decode.
+int yzma_abort_flag(void) {
+    return (int) (intptr_t) &abort_flag;
+}
+
+void yzma_abort_set(int value) {
+    __atomic_store_n(&abort_flag, value != 0 ? 1 : 0, __ATOMIC_RELAXED);
+}
+
+int yzma_abort_get(void) {
+    return __atomic_load_n(&abort_flag, __ATOMIC_RELAXED);
+}
+
+//
 // multimodal
 //
 // These calls follow the mtmd library of llama.cpp. A program makes a bitmap
@@ -2080,6 +2150,9 @@ int yzma_mtmd_input_chunks_init(void) {
 void yzma_mtmd_input_chunks_free(int chunks) {
     mtmd_input_chunks * c = chunk_lists.take(chunks);
     if (c != nullptr) {
+        for (int chunk : chunks_one.drop_owned_by(chunks)) {
+            drop_chunk_children(chunk);
+        }
         mtmd_input_chunks_free(c);
     }
 }
@@ -2152,6 +2225,454 @@ int yzma_mtmd_helper_eval_chunks(int mctx, int ctx, int chunks, int n_past, int 
         return YZMA_ERR_GENERIC;
     }
     return (int) new_n_past;
+}
+
+// yzma_mtmd_default_marker copies the marker that mtmd uses when a projector
+// does not set its own.
+int yzma_mtmd_default_marker(char * buf, int cap) {
+    return copy_text(mtmd_default_marker(), buf, cap);
+}
+
+int yzma_mtmd_decode_use_mrope(int mctx) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    if (c == nullptr) {
+        set_error("invalid mtmd handle %d", mctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return mtmd_decode_use_mrope(c) ? 1 : 0;
+}
+
+// yzma_mtmd_decode_use_non_causal takes a chunk handle of 0 for an image chunk.
+int yzma_mtmd_decode_use_non_causal(int mctx, int chunk) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    if (c == nullptr) {
+        set_error("invalid mtmd handle %d", mctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const mtmd_input_chunk * ch = nullptr;
+    if (chunk != 0) {
+        ch = chunks_one.get(chunk);
+        if (ch == nullptr) {
+            set_error("invalid chunk handle %d", chunk);
+            return YZMA_ERR_HANDLE;
+        }
+    }
+    return mtmd_decode_use_non_causal(c, ch) ? 1 : 0;
+}
+
+int yzma_mtmd_get_audio_sample_rate(int mctx) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    if (c == nullptr) {
+        set_error("invalid mtmd handle %d", mctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return mtmd_get_audio_sample_rate(c);
+}
+
+//
+// bitmaps
+//
+
+// yzma_mtmd_bitmap_init_from_audio makes a bitmap from PCM F32 samples at the
+// sample rate of yzma_mtmd_get_audio_sample_rate.
+int yzma_mtmd_bitmap_init_from_audio(int n_samples, const float * data) {
+    if (n_samples <= 0 || data == nullptr) {
+        set_error("an audio bitmap needs samples, got %d", n_samples);
+        return YZMA_ERR_GENERIC;
+    }
+
+    mtmd_bitmap * bitmap = mtmd_bitmap_init_from_audio((size_t) n_samples, data);
+    if (bitmap == nullptr) {
+        set_error("cannot make an audio bitmap of %d samples", n_samples);
+        return YZMA_ERR_ALLOC;
+    }
+    return bitmaps.add(bitmap);
+}
+
+int yzma_mtmd_bitmap_get_nx(int bitmap) {
+    mtmd_bitmap * b = bitmaps.get(bitmap);
+    if (b == nullptr) {
+        set_error("invalid bitmap handle %d", bitmap);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) mtmd_bitmap_get_nx(b);
+}
+
+int yzma_mtmd_bitmap_get_ny(int bitmap) {
+    mtmd_bitmap * b = bitmaps.get(bitmap);
+    if (b == nullptr) {
+        set_error("invalid bitmap handle %d", bitmap);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) mtmd_bitmap_get_ny(b);
+}
+
+int yzma_mtmd_bitmap_get_n_bytes(int bitmap) {
+    mtmd_bitmap * b = bitmaps.get(bitmap);
+    if (b == nullptr) {
+        set_error("invalid bitmap handle %d", bitmap);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) mtmd_bitmap_get_n_bytes(b);
+}
+
+// yzma_mtmd_bitmap_get_data copies the bytes of a bitmap into out and gives the
+// number of bytes.
+int yzma_mtmd_bitmap_get_data(int bitmap, unsigned char * out, int cap) {
+    mtmd_bitmap * b = bitmaps.get(bitmap);
+    if (b == nullptr) {
+        set_error("invalid bitmap handle %d", bitmap);
+        return YZMA_ERR_HANDLE;
+    }
+
+    const unsigned char * data = mtmd_bitmap_get_data(b);
+    const int n = (int) mtmd_bitmap_get_n_bytes(b);
+    if (data == nullptr || n == 0) {
+        return 0;
+    }
+    if (cap < n) {
+        return YZMA_ERR_TOO_SMALL;
+    }
+    memcpy(out, data, (size_t) n);
+    return n;
+}
+
+int yzma_mtmd_bitmap_is_audio(int bitmap) {
+    mtmd_bitmap * b = bitmaps.get(bitmap);
+    if (b == nullptr) {
+        set_error("invalid bitmap handle %d", bitmap);
+        return YZMA_ERR_HANDLE;
+    }
+    return mtmd_bitmap_is_audio(b) ? 1 : 0;
+}
+
+int yzma_mtmd_bitmap_get_id(int bitmap, char * buf, int cap) {
+    mtmd_bitmap * b = bitmaps.get(bitmap);
+    if (b == nullptr) {
+        set_error("invalid bitmap handle %d", bitmap);
+        return YZMA_ERR_HANDLE;
+    }
+    return copy_text(mtmd_bitmap_get_id(b), buf, cap);
+}
+
+int yzma_mtmd_bitmap_set_id(int bitmap, const char * id) {
+    mtmd_bitmap * b = bitmaps.get(bitmap);
+    if (b == nullptr) {
+        set_error("invalid bitmap handle %d", bitmap);
+        return YZMA_ERR_HANDLE;
+    }
+    mtmd_bitmap_set_id(b, id);
+    return YZMA_OK;
+}
+
+//
+// chunks
+//
+// yzma_mtmd_input_chunks_get gives a borrowed handle, and the list owns the
+// chunk. Freeing the list makes the handle invalid. yzma_mtmd_input_chunk_copy
+// gives a chunk that the caller owns and frees.
+//
+
+int yzma_mtmd_input_chunks_get(int chunks, int idx) {
+    mtmd_input_chunks * list = chunk_lists.get(chunks);
+    if (list == nullptr) {
+        set_error("invalid chunks handle %d", chunks);
+        return YZMA_ERR_HANDLE;
+    }
+    if (idx < 0 || (size_t) idx >= mtmd_input_chunks_size(list)) {
+        set_error("chunk index %d is out of range", idx);
+        return YZMA_ERR_GENERIC;
+    }
+    const mtmd_input_chunk * chunk = mtmd_input_chunks_get(list, (size_t) idx);
+    return chunks_one.add_borrowed((mtmd_input_chunk *) chunk, chunks);
+}
+
+int yzma_mtmd_input_chunk_copy(int chunk) {
+    mtmd_input_chunk * c = chunks_one.get(chunk);
+    if (c == nullptr) {
+        set_error("invalid chunk handle %d", chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    mtmd_input_chunk * copy = mtmd_input_chunk_copy(c);
+    if (copy == nullptr) {
+        set_error("cannot copy chunk %d", chunk);
+        return YZMA_ERR_ALLOC;
+    }
+    return chunks_one.add(copy);
+}
+
+// yzma_mtmd_input_chunk_free frees a copy, and only drops the handle of a chunk
+// that a list owns.
+void yzma_mtmd_input_chunk_free(int chunk) {
+    const bool borrowed = chunks_one.is_borrowed(chunk);
+    mtmd_input_chunk * c = chunks_one.take(chunk);
+    if (c == nullptr) {
+        return;
+    }
+    drop_chunk_children(chunk);
+    if (!borrowed) {
+        mtmd_input_chunk_free(c);
+    }
+}
+
+int yzma_mtmd_input_chunk_get_type(int chunk) {
+    mtmd_input_chunk * c = chunks_one.get(chunk);
+    if (c == nullptr) {
+        set_error("invalid chunk handle %d", chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) mtmd_input_chunk_get_type(c);
+}
+
+int yzma_mtmd_input_chunk_get_n_tokens(int chunk) {
+    mtmd_input_chunk * c = chunks_one.get(chunk);
+    if (c == nullptr) {
+        set_error("invalid chunk handle %d", chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) mtmd_input_chunk_get_n_tokens(c);
+}
+
+int yzma_mtmd_input_chunk_get_n_pos(int chunk) {
+    mtmd_input_chunk * c = chunks_one.get(chunk);
+    if (c == nullptr) {
+        set_error("invalid chunk handle %d", chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    return (int) mtmd_input_chunk_get_n_pos(c);
+}
+
+int yzma_mtmd_input_chunk_get_id(int chunk, char * buf, int cap) {
+    mtmd_input_chunk * c = chunks_one.get(chunk);
+    if (c == nullptr) {
+        set_error("invalid chunk handle %d", chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    return copy_text(mtmd_input_chunk_get_id(c), buf, cap);
+}
+
+// yzma_mtmd_input_chunk_get_tokens_text copies the tokens of a text chunk into
+// out. A chunk that is not text gives 0. A small out gives the negative of the
+// number of tokens.
+int yzma_mtmd_input_chunk_get_tokens_text(int chunk, int * out, int cap) {
+    mtmd_input_chunk * c = chunks_one.get(chunk);
+    if (c == nullptr) {
+        set_error("invalid chunk handle %d", chunk);
+        return YZMA_ERR_BAD_HANDLE;
+    }
+
+    size_t n = 0;
+    const llama_token * tokens = mtmd_input_chunk_get_tokens_text(c, &n);
+    if (tokens == nullptr || n == 0) {
+        return 0;
+    }
+    if ((size_t) cap < n) {
+        return -(int) n;
+    }
+    memcpy(out, tokens, n * sizeof(llama_token));
+    return (int) n;
+}
+
+// yzma_mtmd_input_chunk_get_tokens_image gives a borrowed handle to the image
+// tokens of a chunk, or 0 for a chunk that has none. Freeing the chunk makes the
+// handle invalid.
+int yzma_mtmd_input_chunk_get_tokens_image(int chunk) {
+    mtmd_input_chunk * c = chunks_one.get(chunk);
+    if (c == nullptr) {
+        set_error("invalid chunk handle %d", chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    const mtmd_image_tokens * it = mtmd_input_chunk_get_tokens_image(c);
+    if (it == nullptr) {
+        return 0;
+    }
+    return image_tokens.add_borrowed(it, chunk);
+}
+
+//
+// image tokens
+//
+
+static const mtmd_image_tokens * image_tokens_of(int handle) {
+    const mtmd_image_tokens * it = image_tokens.get(handle);
+    if (it == nullptr) {
+        set_error("invalid image tokens handle %d", handle);
+    }
+    return it;
+}
+
+int yzma_mtmd_image_tokens_get_n_tokens(int handle) {
+    const mtmd_image_tokens * it = image_tokens_of(handle);
+    return it == nullptr ? YZMA_ERR_HANDLE : (int) mtmd_image_tokens_get_n_tokens(it);
+}
+
+// llama.cpp marks these deprecated, but they stay in yzma until llama.cpp
+// removes them.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+int yzma_mtmd_image_tokens_get_nx(int handle) {
+    const mtmd_image_tokens * it = image_tokens_of(handle);
+    return it == nullptr ? YZMA_ERR_HANDLE : (int) mtmd_image_tokens_get_nx(it);
+}
+
+int yzma_mtmd_image_tokens_get_ny(int handle) {
+    const mtmd_image_tokens * it = image_tokens_of(handle);
+    return it == nullptr ? YZMA_ERR_HANDLE : (int) mtmd_image_tokens_get_ny(it);
+}
+
+#pragma GCC diagnostic pop
+
+int yzma_mtmd_image_tokens_get_n_pos(int handle) {
+    const mtmd_image_tokens * it = image_tokens_of(handle);
+    return it == nullptr ? YZMA_ERR_HANDLE : (int) mtmd_image_tokens_get_n_pos(it);
+}
+
+int yzma_mtmd_image_tokens_get_id(int handle, char * buf, int cap) {
+    const mtmd_image_tokens * it = image_tokens_of(handle);
+    return it == nullptr ? YZMA_ERR_HANDLE : copy_text(mtmd_image_tokens_get_id(it), buf, cap);
+}
+
+// yzma_mtmd_image_tokens_get_decoder_pos writes t, x, y, and z into out and
+// returns 4.
+int yzma_mtmd_image_tokens_get_decoder_pos(int handle, int pos_0, int i, int * out) {
+    const mtmd_image_tokens * it = image_tokens_of(handle);
+    if (it == nullptr) {
+        return YZMA_ERR_HANDLE;
+    }
+    const mtmd_decoder_pos p = mtmd_image_tokens_get_decoder_pos(it, (llama_pos) pos_0, (size_t) i);
+    out[0] = (int) p.t;
+    out[1] = (int) p.x;
+    out[2] = (int) p.y;
+    out[3] = (int) p.z;
+    return 4;
+}
+
+//
+// encode
+//
+// The output of an encode is n_embd_inp floats for each token of the chunk.
+// The caller gives that count as n, the same as the GetOutputEmbd of yzma.
+//
+
+int yzma_mtmd_encode_chunk(int mctx, int chunk) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    mtmd_input_chunk * ch = chunks_one.get(chunk);
+    if (c == nullptr || ch == nullptr) {
+        set_error("invalid handle: mtmd %d, chunk %d", mctx, chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    const int rc = mtmd_encode_chunk(c, ch);
+    if (rc != 0) {
+        set_error("mtmd_encode_chunk returned %d", rc);
+        return YZMA_ERR_GENERIC;
+    }
+    return YZMA_OK;
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+int yzma_mtmd_encode(int mctx, int handle) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    const mtmd_image_tokens * it = image_tokens.get(handle);
+    if (c == nullptr || it == nullptr) {
+        set_error("invalid handle: mtmd %d, image tokens %d", mctx, handle);
+        return YZMA_ERR_HANDLE;
+    }
+    const int rc = mtmd_encode(c, it);
+    if (rc != 0) {
+        set_error("mtmd_encode returned %d", rc);
+        return YZMA_ERR_GENERIC;
+    }
+    return YZMA_OK;
+}
+
+#pragma GCC diagnostic pop
+
+int yzma_mtmd_get_output_embd(int mctx, float * out, int n) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    if (c == nullptr) {
+        set_error("invalid mtmd handle %d", mctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const float * embd = mtmd_get_output_embd(c);
+    if (embd == nullptr) {
+        set_error("mtmd context %d has no output embeddings", mctx);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, embd, (size_t) n * sizeof(float));
+    return n;
+}
+
+//
+// batches of media chunks
+//
+// A batch keeps a pointer to each chunk that it gets, so a chunk must stay
+// valid until the batch is encoded.
+//
+
+int yzma_mtmd_batch_init(int mctx) {
+    mtmd_context * c = mtmd_contexts.get(mctx);
+    if (c == nullptr) {
+        set_error("invalid mtmd handle %d", mctx);
+        return YZMA_ERR_HANDLE;
+    }
+    mtmd_batch * b = mtmd_batch_init(c);
+    if (b == nullptr) {
+        set_error("cannot make an mtmd batch");
+        return YZMA_ERR_ALLOC;
+    }
+    return mtmd_batches.add(b);
+}
+
+void yzma_mtmd_batch_free(int batch) {
+    mtmd_batch * b = mtmd_batches.take(batch);
+    if (b != nullptr) {
+        mtmd_batch_free(b);
+    }
+}
+
+// yzma_mtmd_batch_add_chunk gives the result of mtmd_batch_add_chunk, which is
+// 0 for success, 1 for an error, and 2 for a full batch.
+int yzma_mtmd_batch_add_chunk(int batch, int chunk) {
+    mtmd_batch * b = mtmd_batches.get(batch);
+    mtmd_input_chunk * ch = chunks_one.get(chunk);
+    if (b == nullptr || ch == nullptr) {
+        set_error("invalid handle: batch %d, chunk %d", batch, chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    return mtmd_batch_add_chunk(b, ch);
+}
+
+int yzma_mtmd_batch_encode(int batch) {
+    mtmd_batch * b = mtmd_batches.get(batch);
+    if (b == nullptr) {
+        set_error("invalid batch handle %d", batch);
+        return YZMA_ERR_HANDLE;
+    }
+    const int rc = mtmd_batch_encode(b);
+    if (rc != 0) {
+        set_error("mtmd_batch_encode returned %d", rc);
+        return YZMA_ERR_GENERIC;
+    }
+    return YZMA_OK;
+}
+
+int yzma_mtmd_batch_get_output_embd(int batch, int chunk, float * out, int n) {
+    mtmd_batch * b = mtmd_batches.get(batch);
+    mtmd_input_chunk * ch = chunks_one.get(chunk);
+    if (b == nullptr || ch == nullptr) {
+        set_error("invalid handle: batch %d, chunk %d", batch, chunk);
+        return YZMA_ERR_HANDLE;
+    }
+    const float * embd = mtmd_batch_get_output_embd(b, ch);
+    if (embd == nullptr) {
+        set_error("batch %d has no output embeddings for chunk %d", batch, chunk);
+        return YZMA_ERR_GENERIC;
+    }
+    memcpy(out, embd, (size_t) n * sizeof(float));
+    return n;
 }
 
 //

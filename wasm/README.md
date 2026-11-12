@@ -39,6 +39,7 @@ The generation loop stays in Go: one `yzma_decode` and one
 | 10 | `yzma_context_new_kv`, which also takes `kv_unified` and `n_outputs_max`. |
 | 11 | `yzma_process`, which runs an extended batch with the decision order of each token. |
 | 12 | `yzma_model_decision_label`, which gives the label of an option of a decision model. |
+| 13 | The abort flag, `yzma_set_abort_callback` and `yzma_abort_*`, and the rest of the image and audio calls of mtmd: bitmap getters, audio bitmaps, chunk and image token accessors, `yzma_mtmd_encode_chunk`, and the mtmd batch. |
 
 `pkg/llamawasm` drives every version from 1 up to the one it knows, and tests
 for a call before it uses it, so a new yzma still works with the modules of an
