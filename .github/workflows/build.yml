@@ -404,6 +404,90 @@ jobs:
           name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
           archive: false
 
+  # The upstream Windows CUDA build has PTX only for 75, 80 and 90, so it needs a new driver.
+  # This build has device code for each of these GPUs.
+  build-cuda-13-windows-amd64:
+    needs: check-version
+    if: ${{ needs.check-version.outputs.should-build == 'true' }}
+    runs-on: windows-2022
+    env:
+      LLAMA_TAG: ${{ needs.check-version.outputs.llama-tag }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+      - name: Checkout llama.cpp repo
+        uses: actions/checkout@v6
+        with:
+          repository: ggml-org/llama.cpp
+          path: llama.cpp
+          ref: ${{ needs.check-version.outputs.llama-tag }}
+          fetch-tags: 'true'
+      - name: Install CUDA toolkit 13.1
+        uses: ./llama.cpp/.github/actions/windows-setup-cuda
+        with:
+          cuda_version: '13.1'
+          cuda_arch: x64
+      - name: Install Ninja
+        run: choco install ninja
+      - name: Build amd64
+        working-directory: llama.cpp
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          cmake -S . -B build -G "Ninja Multi-Config" ^
+            -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90" ^
+            -DGGML_CUDA_CCCL_VERSION=v3.4.3 ^
+            -DGGML_BACKEND_DL=ON ^
+            -DGGML_NATIVE=OFF ^
+            -DGGML_CPU=OFF ^
+            -DGGML_CUDA=ON ^
+            -DLLAMA_BUILD_SERVER=OFF ^
+            -DLLAMA_BUILD_TESTS=OFF ^
+            -DLLAMA_BUILD_APP=OFF
+          set /A NINJA_JOBS=%NUMBER_OF_PROCESSORS%-1
+          cmake --build build --config Release -j %NINJA_JOBS% --target ggml-cuda
+      - name: Show the device code
+        run: cuobjdump --list-elf .\llama.cpp\build\bin\Release\ggml-cuda.dll
+      - name: Stage artifacts
+        run: |
+          New-Item -ItemType Directory -Force -Path .\pack\cuda, .\pack\cudart | Out-Null
+          Copy-Item .\llama.cpp\build\bin\Release\ggml-cuda.dll .\pack\cuda\
+          foreach ($dir in "bin", "bin\x64") {
+            $src = Join-Path $env:CUDA_PATH $dir
+            if (Test-Path $src) {
+              Get-ChildItem -Path "$src\*" -Include cudart64_*.dll, cublas64_*.dll, cublasLt64_*.dll -File |
+                Copy-Item -Destination .\pack\cudart\
+            }
+          }
+          Get-ChildItem .\pack -Recurse
+          if (-not (Get-ChildItem .\pack\cudart\cudart64_*.dll)) { throw "no CUDA runtime found" }
+      - name: Pack artifacts
+        run: |
+          7z a llama-${env:LLAMA_TAG}-bin-win-cuda-13-x64.zip .\pack\cuda\*
+          7z a cudart-llama-${env:LLAMA_TAG}-bin-win-cuda-13-x64.zip .\pack\cudart\*
+      - name: Hash the artifact contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          source-dir: ./pack/cuda
+      - name: Hash the CUDA runtime contents
+        uses: ./.github/actions/hash-artifact
+        with:
+          archive: cudart-llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          source-dir: ./pack/cudart
+      - name: Upload release binaries
+        uses: actions/upload-artifact@v7
+        with:
+          path: llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          archive: false
+      - name: Upload CUDA runtime
+        uses: actions/upload-artifact@v7
+        with:
+          path: cudart-llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          name: cudart-llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          archive: false
+
   build-vulkan-arm64:
     needs: check-version
     if: ${{ needs.check-version.outputs.should-build == 'true' }}
@@ -972,6 +1056,7 @@ jobs:
       - build-cuda-13-amd64
       - build-cuda-arm64
       - build-cuda-13-arm64
+      - build-cuda-13-windows-amd64
       - build-vulkan-arm64
       - build-trixie-vulkan-arm64
       - build-cpu-arm64
@@ -1009,6 +1094,20 @@ jobs:
           run-id: ${{ github.run_id }}
           artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
           destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-ubuntu-cuda-13-arm64.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download Windows amd64 CUDA 13 artifact
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          destination: llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download Windows amd64 CUDA 13 runtime
+        uses: ./.github/actions/download-artifact
+        with:
+          run-id: ${{ github.run_id }}
+          artifact-name: cudart-llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
+          destination: cudart-llama-${{ needs.check-version.outputs.llama-tag }}-bin-win-cuda-13-x64.zip
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Download arm64 Vulkan artifact
         uses: ./.github/actions/download-artifact
@@ -1075,7 +1174,7 @@ jobs:
           body: |
             ## Changes in llama.cpp ${{ needs.check-version.outputs.llama-tag }}
             See the [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/${{ needs.check-version.outputs.llama-tag }}) for details.
-          artifacts: "*.tar.gz"
+          artifacts: "*.tar.gz,*.zip"
 
   digests:
     needs:

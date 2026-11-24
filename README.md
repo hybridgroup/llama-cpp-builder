@@ -2,7 +2,7 @@
 
 ## Prebuilt binaries for the platforms that the normal builds leave out
 
-This repo builds binary versions of `llama.cpp` libraries and executables for architectures that are not already part of the normal builds: Linux with CUDA or Vulkan, Linux arm64 with CPU, Vulkan, or OpenCL, and WebAssembly for a browser.
+This repo builds binary versions of `llama.cpp` libraries and executables for architectures that are not already part of the normal builds: Linux with CUDA or Vulkan, Windows CUDA for older drivers, Linux arm64 with CPU, Vulkan, or OpenCL, and WebAssembly for a browser.
 
 New releases are built automatically, and `llama.cpp` is checked twice per hour. A tagged
 release such as `v0.4.0` is built first, and only until it is here, so a nightly build
@@ -24,12 +24,15 @@ Currently supported CUDA build configurations:
 | amd64  | Ubuntu 24.04      | 13.0.88  | 75, 80, 86, 89, 90  |
 | arm64  | Ubuntu 22.04      | 12.9  | 87, 121  |
 | arm64  | Ubuntu 22.04      | 13.0.88  | 87, 121  |
+| amd64  | Windows      | 13.1  | 75, 80, 86, 89, 90  |
 
 Compute architectures `86` and `89` are those used by consumer video cards.
 
 Compute architecture `87` is used by Jetson Orin and Jetson AGX.
 
 Compute architecture `121` is used by the GB10 superchip in the NVIDIA DGX Spark.
+
+The Windows build has `ggml-cuda.dll` and the CUDA runtime only. Use it with the upstream `win-cpu-x64` archive of the same build. The upstream Windows CUDA build has only PTX for `75`, `80` and `90`, so these GPUs need a driver for the same CUDA version. This build has device code for them, so a CUDA 13.1 or later driver is sufficient.
 
 ## Vulkan
 
