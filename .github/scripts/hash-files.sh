@@ -41,8 +41,9 @@ cd "$SRC_DIR"
 
 # A regular file gives its digest. A symbolic link has no bytes of its own, so it
 # gives the name it points to. An archive holds both, and a client writes both.
+# On Git for Windows, sha256sum writes "*" before the name to show binary mode.
 FILE_LINES=$(find . -type f -print0 | sort -z | xargs -0 -r sha256sum |
-  sed "s|^\([0-9a-f]\{64\}\)  \./|\1$(printf '\t')|")
+  sed "s|^\([0-9a-f]\{64\}\) [ *]\./|\1$(printf '\t')|")
 LINK_LINES=$(find . -type l -printf '%l\t%p\n' | sort | sed "s|$(printf '\t')\./|$(printf '\t')|")
 
 {
