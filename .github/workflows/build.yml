@@ -471,7 +471,14 @@ jobs:
           set /A NINJA_JOBS=%NUMBER_OF_PROCESSORS%-1
           cmake --build build --config Release -j %NINJA_JOBS% --target ggml-cuda
       - name: Show the device code
-        run: cuobjdump --list-elf .\llama.cpp\build\bin\Release\ggml-cuda.dll
+        run: |
+          curl -sfLO https://developer.download.nvidia.com/compute/cuda/redist/cuda_cuobjdump/windows-x86_64/cuda_cuobjdump-windows-x86_64-13.1.80-archive.zip
+          7z x -ocuobjdump cuda_cuobjdump-windows-x86_64-13.1.80-archive.zip | Out-Null
+          $elf = & (Get-ChildItem -Recurse -Filter cuobjdump.exe .\cuobjdump).FullName --list-elf .\llama.cpp\build\bin\Release\ggml-cuda.dll
+          $elf | Select-String -Pattern 'sm_\d+' -AllMatches | ForEach-Object { $_.Matches.Value } | Sort-Object -Unique
+          foreach ($sm in 'sm_75', 'sm_80', 'sm_86', 'sm_89', 'sm_90') {
+            if (-not ($elf -match "\.$sm\.")) { throw "no device code for $sm" }
+          }
       - name: Stage artifacts
         run: |
           New-Item -ItemType Directory -Force -Path .\pack\cuda, .\pack\cudart | Out-Null
