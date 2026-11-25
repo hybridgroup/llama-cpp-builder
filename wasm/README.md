@@ -41,6 +41,7 @@ The generation loop stays in Go: one `yzma_decode` and one
 | 12 | `yzma_model_decision_label`, which gives the label of an option of a decision model. |
 | 13 | The abort flag, `yzma_set_abort_callback` and `yzma_abort_*`, and the rest of the image and audio calls of mtmd: bitmap getters, audio bitmaps, chunk and image token accessors, `yzma_mtmd_encode_chunk`, and the mtmd batch. |
 | 14 | `yzma_process_embd`, which runs an extended batch with token embeddings, state embeddings, and 4 positions for each entry. |
+| 15 | `yzma_process_ext`, which also takes the decision group of each entry, `yzma_sampler_apply`, `yzma_get_model`, `yzma_get_causal_attn`, `yzma_model_meta_arr_n`, `yzma_model_meta_arr_str`, and `yzma_version`. |
 
 `pkg/llamawasm` drives every version from 1 up to the one it knows, and tests
 for a call before it uses it, so a new yzma still works with the modules of an

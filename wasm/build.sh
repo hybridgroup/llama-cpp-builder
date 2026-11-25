@@ -191,6 +191,7 @@ if [[ $webgpu -eq 1 ]]; then
         "yzma_encode_batch"
         "yzma_process"
         "yzma_process_embd"
+        "yzma_process_ext"
         "yzma_get_embeddings_seq"
         "yzma_get_embeddings_ith"
         "yzma_get_embeddings"
