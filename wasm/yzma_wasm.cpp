@@ -31,7 +31,7 @@
 #include <string>
 #include <vector>
 
-#define YZMA_ABI_VERSION 14
+#define YZMA_ABI_VERSION 15
 
 // Error codes. These are also in the Go code.
 enum {
@@ -125,6 +125,15 @@ struct table {
             return false;
         }
         return borrowed[handle - 1];
+    }
+
+    int handle_of(const T * item) const {
+        for (size_t i = 0; i < items.size(); i++) {
+            if (items[i] != nullptr && items[i] == item) {
+                return (int) i + 1;
+            }
+        }
+        return 0;
     }
 
     T * take(int handle) {
@@ -951,6 +960,31 @@ int yzma_set_causal_attn(int ctx, int causal) {
     return YZMA_OK;
 }
 
+// yzma_get_causal_attn gives 1 if the attention is causal.
+int yzma_get_causal_attn(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_get_causal_attn(c) ? 1 : 0;
+}
+
+// yzma_get_model gives the handle of the model of a context.
+int yzma_get_model(int ctx) {
+    llama_context * c = contexts.get(ctx);
+    if (c == nullptr) {
+        set_error("invalid context handle %d", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    const int handle = models.handle_of(llama_get_model(c));
+    if (handle == 0) {
+        set_error("the model of context %d has no handle", ctx);
+        return YZMA_ERR_HANDLE;
+    }
+    return handle;
+}
+
 // yzma_synchronize waits for the computation of the context to end.
 int yzma_synchronize(int ctx) {
     llama_context * c = contexts.get(ctx);
@@ -1436,11 +1470,15 @@ int yzma_encode_batch(int ctx, const int * tokens, const int * pos, const int * 
     return run_batch(ctx, tokens, pos, n_seq_id, seq_ids, n_seq_max, logits, n_tokens, true);
 }
 
-// yzma_process makes a llama_batch_ext out of the same arrays as yzma_decode_batch
-// and runs llama_process. order holds the decision order of each token, or is 0.
-int yzma_process(int ctx, int type, const int * tokens, const int * pos, const int * n_seq_id,
-                 const int * seq_ids, int n_seq_max, const signed char * outputs, const int * order,
-                 int n_tokens) {
+// process_batch makes a llama_batch_ext and runs llama_process. pos has n_pos
+// positions for each entry, 1 or 4. A token of -1 is an entry with no token.
+// order, group, embd and desc can be null. desc has 4 values for each entry:
+// the offset and the length in embd of the token embedding, and then of the
+// state embedding. A length of 0 is none.
+static int process_batch(int ctx, int type, const int * tokens, const int * pos, int n_pos,
+                         const int * n_seq_id, const int * seq_ids, int n_seq_max,
+                         const signed char * outputs, const int * order, const int * group,
+                         const float * embd, const int * desc, int n_tokens) {
     llama_context * c = contexts.get(ctx);
     if (c == nullptr) {
         set_error("invalid context handle %d", ctx);
@@ -1449,6 +1487,10 @@ int yzma_process(int ctx, int type, const int * tokens, const int * pos, const i
     if (n_tokens <= 0 || n_seq_max <= 0) {
         set_error("a batch needs a minimum of one token and one sequence, got %d and %d",
                   n_tokens, n_seq_max);
+        return YZMA_ERR_GENERIC;
+    }
+    if (n_pos != 1 && n_pos != 4) {
+        set_error("an entry has 1 or 4 positions, got %d", n_pos);
         return YZMA_ERR_GENERIC;
     }
 
@@ -1460,27 +1502,50 @@ int yzma_process(int ctx, int type, const int * tokens, const int * pos, const i
 
     for (int i = 0; i < n_tokens; i++) {
         const int * seqs = seq_ids + (size_t) i * (size_t) n_seq_max;
+        const int * d = desc == nullptr ? nullptr : desc + (size_t) i * 4;
         if (n_seq_id[i] < 1 || n_seq_id[i] > n_seq_max) {
             llama_batch_ext_free(batch);
             set_error("entry %d has %d sequences, want 1 to %d", i, n_seq_id[i], n_seq_max);
             return YZMA_ERR_GENERIC;
         }
-        const int32_t idx = llama_batch_ext_add_token(batch, seqs[0], tokens[i]);
+        if (d != nullptr && (d[0] < 0 || d[1] < 0 || d[2] < 0 || d[3] < 0 ||
+                             (embd == nullptr && (d[1] > 0 || d[3] > 0)))) {
+            llama_batch_ext_free(batch);
+            set_error("entry %d has a bad embedding descriptor", i);
+            return YZMA_ERR_GENERIC;
+        }
+
+        const int32_t idx = tokens[i] == LLAMA_TOKEN_NULL
+            ? llama_batch_ext_add(batch, seqs[0])
+            : llama_batch_ext_add_token(batch, seqs[0], tokens[i]);
         if (idx < 0) {
             llama_batch_ext_free(batch);
-            set_error("llama_batch_ext_add_token returned %d for entry %d", idx, i);
+            set_error("the batch returned %d for entry %d", idx, i);
             return YZMA_ERR_GENERIC;
+        }
+
+        llama_pos p[4] = {};
+        for (int k = 0; k < n_pos; k++) {
+            p[k] = pos[(size_t) i * (size_t) n_pos + k];
         }
 
         bool ok = true;
         for (int s = 1; s < n_seq_id[i] && ok; s++) {
             ok = llama_batch_ext_add_seq(batch, idx, seqs[s]);
         }
-        const llama_pos p = pos[i];
-        ok = ok && llama_batch_ext_set_pos(batch, idx, &p);
+        if (ok && d != nullptr && d[1] > 0) {
+            ok = llama_batch_ext_set_embd_token(batch, idx, { embd + d[0], 1, (size_t) d[1] });
+        }
+        if (ok && d != nullptr && d[3] > 0) {
+            ok = llama_batch_ext_set_embd_state(batch, idx, { embd + d[2], 1, (size_t) d[3] });
+        }
+        ok = ok && llama_batch_ext_set_pos(batch, idx, p);
         ok = ok && llama_batch_ext_set_output_logits(batch, idx, outputs[i] != 0);
         if (ok && order != nullptr) {
             ok = llama_batch_ext_set_decision_order(batch, idx, (enum llama_decision_order) order[i]);
+        }
+        if (ok && group != nullptr) {
+            ok = llama_batch_ext_set_decision_group(batch, idx, group[i]);
         }
         if (!ok) {
             llama_batch_ext_free(batch);
@@ -1497,81 +1562,32 @@ int yzma_process(int ctx, int type, const int * tokens, const int * pos, const i
     return rc;
 }
 
-// yzma_process_embd is yzma_process for entries that can have embeddings.
-// A token of -1 is an entry with no token. pos has 4 positions for each entry.
-// desc has 4 values for each entry: the offset and the length in embd of the
-// token embedding, and then of the state embedding. A length of 0 is none.
+// yzma_process makes a llama_batch_ext out of the same arrays as yzma_decode_batch
+// and runs llama_process. order holds the decision order of each token, or is 0.
+int yzma_process(int ctx, int type, const int * tokens, const int * pos, const int * n_seq_id,
+                 const int * seq_ids, int n_seq_max, const signed char * outputs, const int * order,
+                 int n_tokens) {
+    return process_batch(ctx, type, tokens, pos, 1, n_seq_id, seq_ids, n_seq_max, outputs, order,
+                         nullptr, nullptr, nullptr, n_tokens);
+}
+
+// yzma_process_embd is yzma_process for entries that can have embeddings, with
+// 4 positions for each entry. See process_batch for embd and desc.
 int yzma_process_embd(int ctx, int type, const int * tokens, const int * pos, const int * n_seq_id,
                       const int * seq_ids, int n_seq_max, const signed char * outputs, const int * order,
                       const float * embd, const int * desc, int n_tokens) {
-    llama_context * c = contexts.get(ctx);
-    if (c == nullptr) {
-        set_error("invalid context handle %d", ctx);
-        return YZMA_ERR_HANDLE;
-    }
-    if (n_tokens <= 0 || n_seq_max <= 0) {
-        set_error("a batch needs a minimum of one token and one sequence, got %d and %d",
-                  n_tokens, n_seq_max);
-        return YZMA_ERR_GENERIC;
-    }
+    return process_batch(ctx, type, tokens, pos, 4, n_seq_id, seq_ids, n_seq_max, outputs, order,
+                         nullptr, embd, desc, n_tokens);
+}
 
-    llama_batch_ext * batch = llama_batch_ext_init(c);
-    if (batch == nullptr) {
-        set_error("cannot make an extended batch for context %d", ctx);
-        return YZMA_ERR_ALLOC;
-    }
-
-    for (int i = 0; i < n_tokens; i++) {
-        const int * seqs = seq_ids + (size_t) i * (size_t) n_seq_max;
-        const int * d = desc + (size_t) i * 4;
-        if (n_seq_id[i] < 1 || n_seq_id[i] > n_seq_max) {
-            llama_batch_ext_free(batch);
-            set_error("entry %d has %d sequences, want 1 to %d", i, n_seq_id[i], n_seq_max);
-            return YZMA_ERR_GENERIC;
-        }
-        if (d[0] < 0 || d[1] < 0 || d[2] < 0 || d[3] < 0 || (embd == nullptr && (d[1] > 0 || d[3] > 0))) {
-            llama_batch_ext_free(batch);
-            set_error("entry %d has a bad embedding descriptor", i);
-            return YZMA_ERR_GENERIC;
-        }
-
-        const int32_t idx = tokens[i] == LLAMA_TOKEN_NULL
-            ? llama_batch_ext_add(batch, seqs[0])
-            : llama_batch_ext_add_token(batch, seqs[0], tokens[i]);
-        if (idx < 0) {
-            llama_batch_ext_free(batch);
-            set_error("the batch returned %d for entry %d", idx, i);
-            return YZMA_ERR_GENERIC;
-        }
-
-        bool ok = true;
-        for (int s = 1; s < n_seq_id[i] && ok; s++) {
-            ok = llama_batch_ext_add_seq(batch, idx, seqs[s]);
-        }
-        if (ok && d[1] > 0) {
-            ok = llama_batch_ext_set_embd_token(batch, idx, { embd + d[0], 1, (size_t) d[1] });
-        }
-        if (ok && d[3] > 0) {
-            ok = llama_batch_ext_set_embd_state(batch, idx, { embd + d[2], 1, (size_t) d[3] });
-        }
-        ok = ok && llama_batch_ext_set_pos(batch, idx, pos + (size_t) i * 4);
-        ok = ok && llama_batch_ext_set_output_logits(batch, idx, outputs[i] != 0);
-        if (ok && order != nullptr) {
-            ok = llama_batch_ext_set_decision_order(batch, idx, (enum llama_decision_order) order[i]);
-        }
-        if (!ok) {
-            llama_batch_ext_free(batch);
-            set_error("the batch rejected entry %d", i);
-            return YZMA_ERR_GENERIC;
-        }
-    }
-
-    const int rc = llama_process(c, (enum llama_process_type) type, batch);
-    llama_batch_ext_free(batch);
-    if (rc != 0) {
-        set_error("llama_process returned %d", rc);
-    }
-    return rc;
+// yzma_process_ext is yzma_process_embd with n_pos positions for each entry and
+// the decision group of each entry. group can be 0.
+int yzma_process_ext(int ctx, int type, const int * tokens, const int * pos, int n_pos,
+                     const int * n_seq_id, const int * seq_ids, int n_seq_max,
+                     const signed char * outputs, const int * order, const int * group,
+                     const float * embd, const int * desc, int n_tokens) {
+    return process_batch(ctx, type, tokens, pos, n_pos, n_seq_id, seq_ids, n_seq_max, outputs, order,
+                         group, embd, desc, n_tokens);
 }
 
 // yzma_get_embeddings_seq copies n float values of the embedding of a sequence
@@ -1924,6 +1940,41 @@ int yzma_sampler_sample(int smpl, int ctx, int idx) {
         return YZMA_ERR_HANDLE;
     }
     return llama_sampler_sample(s, c, idx);
+}
+
+// yzma_sampler_apply runs a sampler on n candidates and gives the new number of
+// candidates. The sampler changes ids, logits and p in place. state holds the
+// selected index and the sorted flag, in and out.
+int yzma_sampler_apply(int smpl, int * ids, float * logits, float * p, int * state, int n) {
+    llama_sampler * s = samplers.get(smpl);
+    if (s == nullptr) {
+        set_error("invalid sampler handle %d", smpl);
+        return YZMA_ERR_HANDLE;
+    }
+    if (n < 0) {
+        set_error("a negative number of candidates %d", n);
+        return YZMA_ERR_GENERIC;
+    }
+
+    std::vector<llama_token_data> data((size_t) n);
+    for (int i = 0; i < n; i++) {
+        data[i] = { ids[i], logits[i], p[i] };
+    }
+    llama_token_data_array cur = { data.data(), (size_t) n, state[0], state[1] != 0 };
+    llama_sampler_apply(s, &cur);
+
+    if (cur.size > (size_t) n) {
+        set_error("the sampler gave %zu candidates from %d", cur.size, n);
+        return YZMA_ERR_GENERIC;
+    }
+    for (size_t i = 0; i < cur.size; i++) {
+        ids[i] = cur.data[i].id;
+        logits[i] = cur.data[i].logit;
+        p[i] = cur.data[i].p;
+    }
+    state[0] = (int) cur.selected;
+    state[1] = cur.sorted ? 1 : 0;
+    return (int) cur.size;
 }
 
 int yzma_sampler_accept(int smpl, int token) {
@@ -2809,6 +2860,32 @@ int yzma_model_meta_val_str(int model, const char * key, char * buf, int cap) {
     return llama_model_meta_val_str(m, key, buf, (size_t) cap);
 }
 
+// yzma_model_meta_arr_n gives the number of elements of the metadata string
+// array key, or -1 if there is no such array.
+int yzma_model_meta_arr_n(int model, const char * key) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    return llama_model_meta_arr_n(m, key);
+}
+
+// yzma_model_meta_arr_str copies element i of the metadata string array key into
+// buf. No such array or element gives -1.
+int yzma_model_meta_arr_str(int model, const char * key, int i, char * buf, int cap) {
+    llama_model * m = models.get(model);
+    if (m == nullptr) {
+        set_error("invalid model handle %d", model);
+        return YZMA_ERR_HANDLE;
+    }
+    const char * s = llama_model_meta_arr_str(m, key, i);
+    if (s == nullptr) {
+        return -1;
+    }
+    return copy_string(s, buf, cap);
+}
+
 // yzma_model_meta_key_str copies the name of a key of llama_model_meta_key into
 // buf. A key that is not known gives 0.
 int yzma_model_meta_key_str(int key, char * buf, int cap) {
@@ -2960,6 +3037,10 @@ int yzma_perf_sampler_reset(int chain) {
 //
 // system
 //
+
+int yzma_version(char * buf, int cap) {
+    return copy_string(llama_version(), buf, cap);
+}
 
 int yzma_print_system_info(char * buf, int cap) {
     return copy_string(llama_print_system_info(), buf, cap);
