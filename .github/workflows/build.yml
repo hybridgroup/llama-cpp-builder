@@ -273,7 +273,7 @@ jobs:
         id: cache-gcc
         with:
           path: /usr/local/gcc-14.3.0
-          key: gcc-14.3.0-arm64-cuda-ubuntu22.04-v2
+          key: gcc-14.3.0-arm64-cuda-ubuntu22.04-v3
       - name: Build GCC 14.3.0
         if: steps.cache-gcc.outputs.cache-hit != 'true'
         run: |
@@ -364,7 +364,7 @@ jobs:
         id: cache-gcc
         with:
           path: /usr/local/gcc-14.3.0
-          key: gcc-14.3.0-arm64-cuda-13-ubuntu22.04-v2
+          key: gcc-14.3.0-arm64-cuda-ubuntu22.04-v3
       - name: Build GCC 14.3.0
         if: steps.cache-gcc.outputs.cache-hit != 'true'
         run: |
@@ -454,7 +454,7 @@ jobs:
         id: cache-gcc-vulkan
         with:
           path: ./gcc-14.3.0
-          key: gcc-14.3.0-arm64-vulkan-ubuntu22.04-v3
+          key: gcc-14.3.0-arm64-ubuntu22.04-v4
       - name: Build GCC 14.3.0
         if: steps.cache-gcc-vulkan.outputs.cache-hit != 'true'
         run: |
@@ -556,7 +556,7 @@ jobs:
         id: cache-gcc-trixie-vulkan
         with:
           path: ./gcc-14.3.0
-          key: gcc-14.3.0-arm64-vulkan-ubuntu24.04-v1
+          key: gcc-14.3.0-arm64-ubuntu24.04-v2
       - name: Build GCC 14.3.0
         if: steps.cache-gcc-trixie-vulkan.outputs.cache-hit != 'true'
         run: |
@@ -657,7 +657,7 @@ jobs:
         id: cache-gcc-cpu
         with:
           path: ./gcc-14.3.0
-          key: gcc-14.3.0-arm64-cpu-ubuntu22.04-v1
+          key: gcc-14.3.0-arm64-ubuntu22.04-v4
       - name: Build GCC 14.3.0
         if: steps.cache-gcc-cpu.outputs.cache-hit != 'true'
         run: |
@@ -739,7 +739,7 @@ jobs:
         id: cache-gcc-trixie-cpu
         with:
           path: ./gcc-14.3.0
-          key: gcc-14.3.0-arm64-cpu-ubuntu24.04-v1
+          key: gcc-14.3.0-arm64-ubuntu24.04-v2
       - name: Build GCC 14.3.0
         if: steps.cache-gcc-trixie-cpu.outputs.cache-hit != 'true'
         run: |
@@ -822,7 +822,7 @@ jobs:
         id: cache-gcc-trixie-opencl
         with:
           path: ./gcc-14.3.0
-          key: gcc-14.3.0-arm64-opencl-ubuntu24.04-v1
+          key: gcc-14.3.0-arm64-ubuntu24.04-v2
       - name: Build GCC 14.3.0
         if: steps.cache-gcc-trixie-opencl.outputs.cache-hit != 'true'
         run: |
