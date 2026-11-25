@@ -429,6 +429,13 @@ jobs:
           cuda_arch: x64
       - name: Install Ninja
         run: choco install ninja
+      - name: ccache
+        uses: ggml-org/ccache-action@v1.2.24
+        with:
+          key: cuda-13-windows-amd64
+          max-size: 1G
+          evict-old-files: job
+      # 221 and 177 come from the llama.cpp CUDA source on MSVC and are harmless.
       - name: Build amd64
         working-directory: llama.cpp
         shell: cmd
@@ -436,6 +443,7 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
           cmake -S . -B build -G "Ninja Multi-Config" ^
             -DCMAKE_CUDA_ARCHITECTURES="75;80;86;89;90" ^
+            -DCMAKE_CUDA_FLAGS="-diag-suppress=221,177" ^
             -DGGML_CUDA_CCCL_VERSION=v3.4.3 ^
             -DGGML_BACKEND_DL=ON ^
             -DGGML_NATIVE=OFF ^
