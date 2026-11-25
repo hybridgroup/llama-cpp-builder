@@ -128,7 +128,7 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
             apt update
-            apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip wget
+            apt install -y build-essential ninja-build ccache libgomp1 git libssl-dev libcurl4-openssl-dev zip wget
       - name: Setup cmake 4.2.0
         run: |
           mkdir -p ./cmake-4.2.0
@@ -137,6 +137,12 @@ jobs:
           sh cmake.sh --prefix=/usr/local --skip-license
           cd ..
           rm -rf cmake-4.2.0
+      - name: ccache
+        uses: ggml-org/ccache-action@v1.2.24
+        with:
+          key: cuda-amd64
+          max-size: 1G
+          evict-old-files: job
       - name: Build amd64
         working-directory: llama.cpp
         run: |
@@ -191,7 +197,7 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
             apt update
-            apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip wget
+            apt install -y build-essential ninja-build ccache libgomp1 git libssl-dev libcurl4-openssl-dev zip wget
       - name: Setup cmake 4.2.0
         run: |
           mkdir -p ./cmake-4.2.0
@@ -200,6 +206,12 @@ jobs:
           sh cmake.sh --prefix=/usr/local --skip-license
           cd ..
           rm -rf cmake-4.2.0
+      - name: ccache
+        uses: ggml-org/ccache-action@v1.2.24
+        with:
+          key: cuda-13-amd64
+          max-size: 1G
+          evict-old-files: job
       - name: Build amd64
         working-directory: llama.cpp
         run: |
@@ -255,7 +267,7 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt update
-          apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
+          apt install -y build-essential ninja-build ccache libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
       - name: Cache GCC 14.3.0
         uses: actions/cache@v5
         id: cache-gcc
@@ -284,6 +296,12 @@ jobs:
           sh cmake.sh --prefix=/usr/local --skip-license
           cd ..
           rm -rf cmake-4.2.0
+      - name: ccache
+        uses: ggml-org/ccache-action@v1.2.24
+        with:
+          key: cuda-arm64
+          max-size: 1G
+          evict-old-files: job
       - name: Build arm64
         working-directory: llama.cpp
         run: |
@@ -340,7 +358,7 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt update
-          apt install -y build-essential ninja-build libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
+          apt install -y build-essential ninja-build ccache libgomp1 git libssl-dev libcurl4-openssl-dev zip libmpfr-dev libgmp-dev libmpc-dev wget
       - name: Cache GCC 14.3.0
         uses: actions/cache@v5
         id: cache-gcc
@@ -369,6 +387,12 @@ jobs:
           sh cmake.sh --prefix=/usr/local --skip-license
           cd ..
           rm -rf cmake-4.2.0
+      - name: ccache
+        uses: ggml-org/ccache-action@v1.2.24
+        with:
+          key: cuda-13-arm64
+          max-size: 1G
+          evict-old-files: job
       - name: Build arm64
         working-directory: llama.cpp
         run: |
